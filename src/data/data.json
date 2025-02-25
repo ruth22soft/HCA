@@ -1,0 +1,114 @@
+{
+  "patients": [
+    {
+      "id": "P001",
+      "firstName": "Abebe",
+      "lastName": "Kebede",
+      "dateOfBirth": "1990-01-01",
+      "gender": "Male",
+      "email": "abebe.kebede@email.com",
+      "phone": "251-911-123456",
+      "address": "Bole Sub City",
+      "city": "Addis Ababa",
+      "state": "Addis Ababa",
+      "zipCode": "1000",
+      "medicalHistory": "Hypertension",
+      "currentMedications": "Lisinopril",
+      "allergies": "None",
+      "bloodGroup": "O+",
+      "weight": "75",
+      "height": "175",
+      "emergencyContact": {
+        "name": "Tigist Abebe",
+        "relationship": "Spouse",
+        "phone": "251-922-123456"
+      }
+    },
+    {
+      "id": "P002",
+      "firstName": "Kidist",
+      "lastName": "Hailu",
+      "dateOfBirth": "1985-05-15",
+      "gender": "Female",
+      "email": "kidist.hailu@email.com",
+      "phone": "251-933-123456",
+      "address": "Kirkos Sub City",
+      "city": "Addis Ababa",
+      "state": "Addis Ababa",
+      "zipCode": "1001",
+      "medicalHistory": "Diabetes",
+      "currentMedications": "Metformin",
+      "allergies": "None",
+      "bloodGroup": "A+",
+      "weight": "65",
+      "height": "165",
+      "emergencyContact": {
+        "name": "Dawit Hailu",
+        "relationship": "Brother",
+        "phone": "251-944-123456"
+      }
+    }
+  ],
+  "physicians": [
+    {
+      "id": "DR001",
+      "firstName": "Yohannes",
+      "lastName": "Tadesse",
+      "specialization": "Neurologist",
+      "email": "dr.yohannes@hospital.com",
+      "phone": "251-911-987654",
+      "licenseNumber": "MED12345",
+      "department": "Neurology",
+      "education": "MD, Addis Ababa University",
+      "experience": "15 years",
+      "availability": {
+        "monday": "9:00 AM - 5:00 PM",
+        "tuesday": "9:00 AM - 5:00 PM",
+        "wednesday": "9:00 AM - 5:00 PM",
+        "thursday": "9:00 AM - 5:00 PM",
+        "friday": "9:00 AM - 3:00 PM"
+      }
+    },
+    {
+      "id": "DR002",
+      "firstName": "Bethlehem",
+      "lastName": "Alemu",
+      "specialization": "Cardiologist",
+      "email": "dr.bethlehem@hospital.com",
+      "phone": "251-922-987654",
+      "licenseNumber": "MED67890",
+      "department": "Cardiology",
+      "education": "MD, St. Paul's Hospital Millennium Medical College",
+      "experience": "20 years",
+      "availability": {
+        "monday": "8:00 AM - 4:00 PM",
+        "tuesday": "8:00 AM - 4:00 PM",
+        "wednesday": "8:00 AM - 4:00 PM",
+        "thursday": "8:00 AM - 4:00 PM",
+        "friday": "8:00 AM - 2:00 PM"
+      }
+    }
+  ],
+  "appointments": [
+    {
+      "id": "APT001",
+      "patientId": "P001",
+      "physicianId": "DR001",
+      "date": "2024-03-20",
+      "time": "10:00 AM",
+      "status": "Scheduled",
+      "type": "Regular Checkup",
+      "notes": "Follow-up appointment"
+    },
+    {
+      "id": "APT002",
+      "patientId": "P002",
+      "physicianId": "DR002",
+      "date": "2024-03-21",
+      "time": "2:00 PM",
+      "status": "Scheduled",
+      "type": "Consultation",
+      "notes": "Initial visit"
+    }
+  ]
+}
