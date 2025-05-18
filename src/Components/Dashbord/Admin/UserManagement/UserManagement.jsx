@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { 
   Card, CardContent, Typography, Grid, TextField, Button, MenuItem, Container, ListItemIcon, ListItemText 
 } from "@mui/material";
-import { AccountCircle, Settings, ExitToApp, VpnKey, Person, Dashboard, People, CalendarToday, Assessment } from "@mui/icons-material";
+import { AccountCircle, Settings, ExitToApp, VpnKey, Person, Dashboard, People, CalendarToday, Assessment, CheckCircle } from "@mui/icons-material";
 import DashboardLayout from "../../DasboardLayout";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../Auth/AuthContext';
@@ -16,9 +16,15 @@ const UserManagement = () => {
     role: "",
   });
 
-  const [accountEmail, setAccountEmail] = useState("");
   const [formError, setFormError] = useState("");
+  
+  // Account activation states
+  const [activationData, setActivationData] = useState({
+    email: "",
+    accountStatus: "active" // Default status
+  });
   const [accountError, setAccountError] = useState("");
+  const [activationSuccess, setActivationSuccess] = useState(false);
 
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -42,17 +48,48 @@ const UserManagement = () => {
     console.log("Creating User:", userData);
   };
 
+  // Handle activation data changes
+  const handleActivationChange = (e) => {
+    setActivationData({
+      ...activationData,
+      [e.target.name]: e.target.value
+    });
+    
+    // Clear any previous success message when form is being edited
+    if (activationSuccess) {
+      setActivationSuccess(false);
+    }
+  };
+
   // Handle account activation
   const handleAccountAction = (e) => {
     e.preventDefault();
 
-    if (!accountEmail) {
-      setAccountError("Please enter a valid email.");
+    // Validate form
+    if (!activationData.email) {
+      setAccountError("Please enter a valid email address.");
       return;
     }
 
-    setAccountError(""); // Clear errors
-    console.log("Activating/Deactivating Account for Email:", accountEmail);
+    // Clear errors
+    setAccountError("");
+    
+    // Simulate successful activation
+    console.log("Account action:", {
+      email: activationData.email,
+      status: activationData.accountStatus
+    });
+    
+    // Show success message
+    setActivationSuccess(true);
+    
+    // Reset form after successful submission
+    setTimeout(() => {
+      setActivationData({
+        email: "",
+        accountStatus: "active"
+      });
+    }, 3000);
   };
 
   // Consistent menuItems structure
@@ -126,7 +163,6 @@ const UserManagement = () => {
                   >
                     <MenuItem value="Patient">Patient</MenuItem>
                     <MenuItem value="Physician">Physician</MenuItem>
-                    <MenuItem value="Receptionist">Receptionist</MenuItem>
                   </TextField>
                   <Button type="submit" sx={buttonStyle}>Create Account</Button>
                 </form>
@@ -138,19 +174,53 @@ const UserManagement = () => {
             <Card sx={cardStyle}>
               <CardContent>
                 <VpnKey sx={iconTopStyle} />  
-                <Typography variant="h5" sx={cardTitleStyle}>Activate</Typography>
+                <Typography variant="h5" sx={cardTitleStyle}>Account Activation Management</Typography>
                 {accountError && <Typography sx={errorStyle}>{accountError}</Typography>}
+                {activationSuccess && (
+                  <Typography sx={{
+                    color: "#4caf50",
+                    backgroundColor: "rgba(76, 175, 80, 0.1)",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    textAlign: "center",
+                    marginBottom: "15px",
+                    fontWeight: "500"
+                  }}>
+                    Account successfully {activationData.accountStatus === "active" ? "activated" : "deactivated"}!
+                  </Typography>
+                )}
                 <form onSubmit={handleAccountAction} style={{ marginTop: "10px" }}>
                   <TextField 
-                    label="Email" 
+                    label="User Email Address" 
+                    name="email"
                     type="email"
-                    value={accountEmail} 
-                    onChange={(e) => setAccountEmail(e.target.value)} 
+                    value={activationData.email} 
+                    onChange={handleActivationChange} 
                     fullWidth 
+                    placeholder="Enter user's email address"
                     sx={inputStyle}
+                    required
                   />
-                  <Button type="submit" sx={buttonStyle}>
-                    Activate Account
+                  <TextField
+                    select
+                    label="Account Status"
+                    name="accountStatus"
+                    value={activationData.accountStatus}
+                    onChange={handleActivationChange}
+                    fullWidth
+                    sx={inputStyle}
+                  >
+                    <MenuItem value="active">Activate Account</MenuItem>
+                    <MenuItem value="inactive">Deactivate Account</MenuItem>
+                    <MenuItem value="suspended">Suspend Account</MenuItem>
+                  </TextField>
+                  <Button 
+                    type="submit" 
+                    sx={buttonStyle}
+                    startIcon={activationData.accountStatus === "active" ? <CheckCircle /> : <VpnKey />}
+                  >
+                    {activationData.accountStatus === "active" ? "Activate Account" : 
+                     activationData.accountStatus === "inactive" ? "Deactivate Account" : "Suspend Account"}
                   </Button>
                 </form>
               </CardContent>

@@ -1,27 +1,21 @@
 export const userCredentials = {
     admin: {
         email: 'admin@cnd.com',
-        password: 'admin123',
+        password: '12345678',
         role: 'admin',
         permissions: ['all']
     },
     patient: {
         email: 'patient@cnd.com',
-        password: 'patient123',
+        password: '12345678',
         role: 'patient',
         permissions: ['view_records', 'book_appointments']
     },
     physician: {
         email: 'physician@cnd.com',
-        password: 'physician123',
-        role: 'doctor',
+        password: '12345678',
+        role: 'physician',
         permissions: ['view_patients', 'manage_appointments']
-    },
-    receptionist: {
-        email: 'receptionist@cnd.com',
-        password: 'reception123',
-        role: 'receptionist',
-        permissions: ['manage_appointments', 'view_schedule']
     }
 };
 

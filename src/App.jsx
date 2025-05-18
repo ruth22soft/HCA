@@ -6,16 +6,14 @@ import Home from './Components/Home/Home';
 import Login from './Components/Home/Login';
 import AdminDashboard from './Components/Dashbord/Admin/AdminDashboard/';
 import UserManagement from './Components/Dashbord/Admin/UserManagement/UserManagement';
+import UserList from './Components/Dashbord/Admin/UserList/UserList';
 import Settings from './Components/Dashbord/Admin/Settings/Settings';
 import PatientDashboard from './Components/Dashbord/Patient/PatientDashboard';
 import PhysicianDashboard from './Components/Dashbord/Physician/PhysicianDashboard';
-import ReceptionistDashboard from './Components/Dashbord/Reception/ReceptionistDashboard';
 import RequestAdvice from './Components/Dashbord/Patient/RequestAdvice';
 import AddAppointment from './Components/Dashbord/Patient/AddAppointment';
 import Recommendations from './Components/Dashbord/Patient/Recommendations';
 import Feedback from './Components/Dashbord/Patient/Feedback';
-import RegisterPatient from './Components/Dashbord/Reception/RegisterPatient';
-import AssignPhysician from './Components/Dashbord/Reception/AssignPhysician';
 import GenerateReport from './Components/Dashbord/Physician/GenerateReport';
 import InsertAdvice from './Components/Dashbord/Physician/InsertAdvice';
 import ApproveRecommendations from './Components/Dashbord/Physician/ApproveRecommendations';
@@ -25,63 +23,43 @@ import UpdatePatient from './Components/Dashbord/Physician/UpdatePatient';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
+  // If still loading auth state, show nothing
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  // If no user is logged in, redirect to login
   if (!user) {
+    console.log('No authenticated user, redirecting to login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // User is authenticated, render children
   return children;
 };
 
 function App() {
-  const { user, updatePermissions, login } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
   const [error, setError] = useState(null);
   const location = useLocation();
-  const [permissions, setPermissions] = useState([]);
 
-  // Try to restore user session from localStorage on page load
+  // Log authentication state for debugging
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      login(parsedUser);
-    }
-    setLoading(false);
-  }, [login]);
+    console.log('Auth state in App:', { user, authLoading });
+  }, [user, authLoading]);
 
-  const getDefaultPermissions = useCallback((role) => {
-    const defaultPermissions = {
-      admin: ['all_access', 'manage_users', 'manage_settings'],
-      patient: ['view_appointments', 'book_appointments', 'view_profile'],
-      receptionist: ['manage_appointments', 'view_patients', 'schedule_appointments']
-    };
-    return defaultPermissions[role] || [];
-  }, []);
+  // Show loading indicator while authentication is initializing
+  if (authLoading) {
+    return <div className="app-loading">Loading application...</div>;
+  }
 
-  const fetchPermissions = async () => {
-    try {
-      const mockPermissions = {
-        admin: ['all'],
-        doctor: ['view_patients', 'update_records'],
-        patient: ['view_own_records'],
-        receptionist: ['manage_appointments']
-      };
-      
-      setPermissions(mockPermissions);
-    } catch (error) {
-      console.error('Error in permission setup:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchPermissions();
-  }, []);
-
-  if (loading) return <p>Loading permissions...</p>;
-  if (error) return <p>Error loading permissions: {error.message}</p>;
+  // Show error if there's an error
+  if (error) {
+    return <div className="app-error">Error: {error.message}</div>;
+  }
 
   return (
     <Routes>
@@ -95,14 +73,15 @@ function App() {
           <Routes>
             <Route path="admin/*" element={
               <Routes>
-                <Route index element={<AdminDashboard permissions={permissions} />} />
+                <Route index element={<AdminDashboard />} />
                 <Route path="user-management" element={<UserManagement />} />
+                <Route path="user-list" element={<UserList />} />
                 <Route path="settings" element={<Settings />} />
               </Routes>
             } />
             <Route path="patient/*" element={
               <Routes>
-                <Route index element={<PatientDashboard permissions={permissions} />} />
+                <Route index element={<PatientDashboard />} />
                 <Route path="request-advice" element={<RequestAdvice />} />
                 <Route path="add-appointment" element={<AddAppointment />} />
                 <Route path="recommendations" element={<Recommendations />} />
@@ -111,7 +90,7 @@ function App() {
             } />
             <Route path="physician/*" element={
               <Routes>
-                <Route index element={<PhysicianDashboard permissions={permissions} />} />
+                <Route index element={<PhysicianDashboard />} />
                 <Route path="generate-report" element={<GenerateReport />} />
                 <Route path="insert-advice" element={<InsertAdvice />} />
                 <Route path="approve-recommendations" element={<ApproveRecommendations />} />
@@ -120,39 +99,14 @@ function App() {
                 <Route path="update-patient" element={<UpdatePatient />} />
               </Routes>
             } />
-            <Route path="receptionist/*" element={
-              <Routes>
-                <Route index element={<ReceptionistDashboard permissions={permissions} />} />
-                <Route path="register-patient" element={<RegisterPatient />} />
-                <Route path="assign-physician" element={<AssignPhysician />} />
-              </Routes>
-            } />
           </Routes>
         </ProtectedRoute>
       } />
 
-      {/* Default route - redirects based on user role or to login if no user */}
-      <Route
-        path="/"
-        element={
-          user ? (
-            <Navigate to={`/dashboard/${user.role}`} replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-
       {/* Catch all route */}
       <Route
         path="*"
-        element={
-          user ? (
-            <Navigate to={`/dashboard/${user.role}`} replace />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
+        element={<Navigate to="/" replace />}
       />
     </Routes>
   );

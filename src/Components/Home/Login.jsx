@@ -65,13 +65,6 @@ const Login = () => {
       icon: <MedicalServices fontSize="large" />,
       color: '#2196F3',
       chipColor: 'primary'
-    },
-    receptionist: {
-      title: 'Receptionist Portal Login',
-      subtitle: 'Access appointment management',
-      icon: <CalendarToday fontSize="large" />,
-      color: '#FF9800',
-      chipColor: 'warning'
     }
   };
 
@@ -102,8 +95,7 @@ const Login = () => {
   const dashboardRoutes = {
     admin: '/dashboard/admin',
     patient: '/dashboard/patient',
-    physician: '/dashboard/doctor',
-    receptionist: '/dashboard/receptionist'
+    physician: '/dashboard/physician'
   };
 
   const handleChange = (e) => {
@@ -119,32 +111,49 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const user = await validateCredentials(formData.email, formData.password);
-      if (user) {
-        login(user);
-        
-        // Update navigation paths
-        switch (user.role) {
-          case 'doctor':
-            navigate('/dashboard/doctor', { replace: true });
-            break;
-          case 'admin':
-            navigate('/dashboard/admin', { replace: true });
-            break;
-          case 'patient':
-            navigate('/dashboard/patient', { replace: true });
-            break;
-          case 'receptionist':
-            navigate('/dashboard/receptionist', { replace: true });
-            break;
-          default:
-            setError('Invalid user role');
-        }
-      } else {
+      // Get credentials from form
+      const { email, password } = formData;
+      console.log('Attempting login with:', { email, password });
+      
+      // Validate credentials
+      const user = await validateCredentials(email, password);
+      
+      if (!user) {
+        console.error('Authentication failed: Invalid credentials');
         setError('Invalid username or password');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error('Login error:', err);
+      
+      console.log('Authentication successful:', user);
+      
+      // Determine dashboard path based on user role
+      let dashboardPath;
+      switch (user.role) {
+        case 'physician':
+          dashboardPath = '/dashboard/physician';
+          break;
+        case 'admin':
+          dashboardPath = '/dashboard/admin';
+          break;
+        case 'patient':
+          dashboardPath = '/dashboard/patient';
+          break;
+        default:
+          setError('Invalid user role');
+          setLoading(false);
+          return;
+      }
+      
+      // Login the user (store in context and localStorage)
+      await login(user);
+      
+      console.log('Login successful, redirecting to:', dashboardPath);
+      
+      // Direct navigation to dashboard
+      window.location.href = dashboardPath;
+    } catch (error) {
+      console.error('Login error:', error);
       setError('An error occurred during login');
     } finally {
       setLoading(false);

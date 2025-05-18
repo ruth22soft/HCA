@@ -16,37 +16,53 @@ const AdminDashboard = () => {
       label: 'Dashboard', 
       path: '/dashboard/admin', 
       icon: <Dashboard />,
-      onClick: () => navigate('/dashboard/admin')
+      onClick: () => {
+        console.log('Navigating to admin dashboard');
+        window.location.href = '/dashboard/admin';
+      }
     },
     { 
       label: 'User Management', 
       path: '/dashboard/admin/user-management', 
       icon: <People />,
-      onClick: () => navigate('/dashboard/admin/user-management')
+      onClick: () => {
+        console.log('Navigating to user management');
+        window.location.href = '/dashboard/admin/user-management';
+      }
+    },
+    { 
+      label: 'User List', 
+      path: '/dashboard/admin/user-list', 
+      icon: <PersonOutline />,
+      onClick: () => {
+        console.log('Navigating to user list');
+        window.location.href = '/dashboard/admin/user-list';
+      }
     },
     { 
       label: 'Settings', 
       path: '/dashboard/admin/settings', 
       icon: <Settings />,
-      onClick: () => navigate('/dashboard/admin/settings')
+      onClick: () => {
+        console.log('Navigating to settings');
+        window.location.href = '/dashboard/admin/settings';
+      }
     }
   ];
 
-  const totalUsers = 253;
+  const totalUsers = 250;
   const activatedAccounts = 120;
   const totalAdmins = 10;
-  const totalReceptionists = 3;
   const totalPhysicians = 30;
   const totalPatients = 90;
 
   const data = [
     { name: 'Admins', value: totalAdmins },
-    { name: 'Receptionists', value: totalReceptionists },
     { name: 'Physicians', value: totalPhysicians },
     { name: 'Patients', value: totalPatients },
   ];
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
   return (
     <DashboardLayout menuItems={menuItems} title="Admin Portal">
@@ -56,7 +72,6 @@ const AdminDashboard = () => {
           { title: 'Total Users', value: totalUsers, icon: <People />, color: 'primary' },
           { title: 'Activated Accounts', value: activatedAccounts, icon: <VerifiedUser />, color: 'secondary' },
           { title: 'Total Admins', value: totalAdmins, icon: <Person />, color: 'primary' },
-          { title: 'Total Receptionists', value: totalReceptionists, icon: <PersonOutline />, color: 'secondary' },
           { title: 'Total Physicians', value: totalPhysicians, icon: <LocalHospital />, color: 'primary' },
           { title: 'Total Patients', value: totalPatients, icon: <PersonOutline />, color: 'secondary' },
         ].map((item, index) => (
@@ -92,10 +107,6 @@ const AdminDashboard = () => {
                     <linearGradient id="color3" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#FFBB28" />
                       <stop offset="100%" stopColor="#D19E00" />
-                    </linearGradient>
-                    <linearGradient id="color4" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#FF8042" />
-                      <stop offset="100%" stopColor="#B94E1B" />
                     </linearGradient>
                   </defs>
                   <Pie

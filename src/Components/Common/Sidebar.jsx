@@ -42,7 +42,8 @@ const Sidebar = ({ items, title }) => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    // Use direct URL navigation instead of React Router's navigate
+    window.location.href = '/';
   };
 
   return (
@@ -69,7 +70,10 @@ const Sidebar = ({ items, title }) => {
           {items.map((item) => (
             <ListItem key={item.text} disablePadding>
               <ListItemButton
-                onClick={() => navigate(item.path)}
+                onClick={() => {
+                  console.log('Navigating to:', item.path);
+                  window.location.href = item.path;
+                }}
                 sx={{
                   '&:hover': {
                     backgroundColor: '#e3f2fd',
