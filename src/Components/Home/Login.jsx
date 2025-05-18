@@ -122,24 +122,22 @@ const Login = () => {
       const user = await validateCredentials(formData.email, formData.password);
       if (user) {
         login(user);
-        console.log('User role:', user.role); // Debug log
-
-        // Navigate based on user role
+        
+        // Update navigation paths
         switch (user.role) {
+          case 'doctor':
+            navigate('/dashboard/doctor', { replace: true });
+            break;
           case 'admin':
             navigate('/dashboard/admin', { replace: true });
             break;
           case 'patient':
             navigate('/dashboard/patient', { replace: true });
             break;
-          case 'doctor':
-            navigate('/dashboard/doctor', { replace: true });
-            break;
           case 'receptionist':
             navigate('/dashboard/receptionist', { replace: true });
             break;
           default:
-            console.error('Unknown user role:', user.role);
             setError('Invalid user role');
         }
       } else {

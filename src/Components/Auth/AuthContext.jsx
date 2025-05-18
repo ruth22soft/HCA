@@ -1,46 +1,20 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    // Initialize user state from localStorage
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [permissions, setPermissions] = useState([]);
+  const [user, setUser] = useState(null);
 
-  const login = useCallback((userData) => {
+  const login = (userData) => {
     setUser(userData);
-    // Save user data to localStorage
-    localStorage.setItem('user', JSON.stringify(userData));
-  }, []);
+  };
 
-  const logout = useCallback(async () => {
-    try {
-      localStorage.removeItem('user'); // Clear user from localStorage
-      setUser(null);
-      setPermissions([]);
-      return Promise.resolve();
-    } catch (error) {
-      return Promise.reject(error);
-    }
-  }, []);
-
-  const updatePermissions = useCallback((newPermissions) => {
-    setPermissions(newPermissions);
-  }, []);
-
-  const value = {
-    user,
-    permissions,
-    login,
-    logout,
-    updatePermissions
+  const logout = () => {
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

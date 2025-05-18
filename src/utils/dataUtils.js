@@ -1,7 +1,13 @@
 import data from '../data/data.json';
 
 export const getPatientById = (id) => {
-  return data.patients.find(patient => patient.id === id);
+  try {
+    const data = require('../data/data.json');
+    return data.patients.find(patient => patient.id === id) || null;
+  } catch (error) {
+    console.error('Error fetching patient data:', error);
+    return null;
+  }
 };
 
 export const getPhysicianById = (id) => {
@@ -9,7 +15,13 @@ export const getPhysicianById = (id) => {
 };
 
 export const getAllPatients = () => {
-  return data.patients;
+  try {
+    const data = require('../data/data.json');
+    return data.patients || [];
+  } catch (error) {
+    console.error('Error fetching all patients:', error);
+    return [];
+  }
 };
 
 export const getAllPhysicians = () => {
@@ -21,5 +33,11 @@ export const getAppointmentsByPatientId = (patientId) => {
 };
 
 export const getAppointmentsByPhysicianId = (physicianId) => {
-  return data.appointments.filter(apt => apt.physicianId === physicianId);
+  try {
+    const data = require('../data/data.json');
+    return data.appointments.filter(apt => apt.physicianId === physicianId) || [];
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    return [];
+  }
 }; 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './Components/Auth/AuthContext';
 import { getUserPermissions } from './Components/Auth/passwords';
@@ -40,6 +40,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const location = useLocation();
+  const [permissions, setPermissions] = useState([]);
 
   // Try to restore user session from localStorage on page load
   useEffect(() => {
@@ -60,51 +61,24 @@ function App() {
     return defaultPermissions[role] || [];
   }, []);
 
+  const fetchPermissions = async () => {
+    try {
+      const mockPermissions = {
+        admin: ['all'],
+        doctor: ['view_patients', 'update_records'],
+        patient: ['view_own_records'],
+        receptionist: ['manage_appointments']
+      };
+      
+      setPermissions(mockPermissions);
+    } catch (error) {
+      console.error('Error in permission setup:', error);
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchPermissions = async () => {
-      if (!user) {
-        setLoading(false);
-        updatePermissions([]);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const rolePermissions = getDefaultPermissions(user.role);
-        
-        let serverPermissions = [];
-        if (user.id) {
-          try {
-            serverPermissions = await getUserPermissions(user.id);
-          } catch (err) {
-            console.error('Error fetching server permissions:', err);
-          }
-        }
-
-        if (isMounted) {
-          const allPermissions = [...new Set([...rolePermissions, ...serverPermissions])];
-          updatePermissions(allPermissions);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error('Error in permission setup:', err);
-          const rolePermissions = getDefaultPermissions(user.role);
-          updatePermissions(rolePermissions);
-          setError(err);
-          setLoading(false);
-        }
-      }
-    };
-
     fetchPermissions();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user, updatePermissions, getDefaultPermissions]);
+  }, []);
 
   if (loading) return <p>Loading permissions...</p>;
   if (error) return <p>Error loading permissions: {error.message}</p>;
@@ -121,14 +95,14 @@ function App() {
           <Routes>
             <Route path="admin/*" element={
               <Routes>
-                <Route index element={<AdminDashboard />} />
+                <Route index element={<AdminDashboard permissions={permissions} />} />
                 <Route path="user-management" element={<UserManagement />} />
                 <Route path="settings" element={<Settings />} />
               </Routes>
             } />
             <Route path="patient/*" element={
               <Routes>
-                <Route index element={<PatientDashboard />} />
+                <Route index element={<PatientDashboard permissions={permissions} />} />
                 <Route path="request-advice" element={<RequestAdvice />} />
                 <Route path="add-appointment" element={<AddAppointment />} />
                 <Route path="recommendations" element={<Recommendations />} />
@@ -137,7 +111,7 @@ function App() {
             } />
             <Route path="physician/*" element={
               <Routes>
-                <Route index element={<PhysicianDashboard />} />
+                <Route index element={<PhysicianDashboard permissions={permissions} />} />
                 <Route path="generate-report" element={<GenerateReport />} />
                 <Route path="insert-advice" element={<InsertAdvice />} />
                 <Route path="approve-recommendations" element={<ApproveRecommendations />} />
@@ -148,7 +122,7 @@ function App() {
             } />
             <Route path="receptionist/*" element={
               <Routes>
-                <Route index element={<ReceptionistDashboard />} />
+                <Route index element={<ReceptionistDashboard permissions={permissions} />} />
                 <Route path="register-patient" element={<RegisterPatient />} />
                 <Route path="assign-physician" element={<AssignPhysician />} />
               </Routes>
