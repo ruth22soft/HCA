@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, 
   Typography, Button, TextField, InputAdornment, IconButton, Chip, Avatar,
-  Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel
+  Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Snackbar, Alert, Container, Box, CircularProgress, Pagination
 } from '@mui/material';
 import { 
   Dashboard, Settings, ExitToApp, People, Search, Edit, Delete, Check, Block, Save, Cancel,
@@ -11,147 +11,131 @@ import {
 } from '@mui/icons-material';
 import DashboardLayout from '../../DasboardLayout';
 import { useAuth } from '../../../Auth/AuthContext';
+import debounce from 'lodash/debounce';
 
 const UserList = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
+
   // Edit user dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editFormData, setEditFormData] = useState({
-    name: '',
+    fullName: '',
     email: '',
-    password: '',
     role: '',
-    status: ''
+    accountStatus: ''
   });
-  
-  // State to toggle password visibility
+
+  // State to toggle password visibility (if needed)
   const [showPassword, setShowPassword] = useState(false);
 
-  // Mock user data - in a real app, this would come from an API
-  const [users, setUsers] = useState([
-    { 
-      id: 1, 
-      name: 'Abebe Kebede', 
-      email: 'abebe@example.com', 
-      role: 'Admin', 
-      status: 'Active',
-      lastLogin: '2025-05-17 14:30'
-    },
-    { 
-      id: 2, 
-      name: 'Kebede Alemu', 
-      email: 'kebede@example.com', 
-      role: 'Physician', 
-      status: 'Active',
-      lastLogin: '2025-05-16 09:15'
-    },
-    { 
-      id: 3, 
-      name: 'Almaz Haile', 
-      email: 'almaz@example.com', 
-      role: 'Patient', 
-      status: 'Inactive',
-      lastLogin: '2025-05-10 11:45'
-    },
-    { 
-      id: 4, 
-      name: 'Tigist Bekele', 
-      email: 'tigist@example.com', 
-      role: 'Physician', 
-      status: 'Active',
-      lastLogin: '2025-05-17 16:20'
-    },
-    { 
-      id: 5, 
-      name: 'Yonas Tadesse', 
-      email: 'yonas@example.com', 
-      role: 'Patient', 
-      status: 'Active',
-      lastLogin: '2025-05-15 13:10'
-    }
-  ]);
+  // Debounced search function
+  const debouncedFetchUsers = useCallback(
+    debounce((search, page) => {
+      fetchUsers(search, page);
+    }, 300),
+    []
+  );
 
-  // Consistent menuItems structure
-  const menuItems = [
-    { 
-      label: 'Dashboard', 
-      path: '/dashboard/admin',
-      icon: <Dashboard />,
-      onClick: () => window.location.href = '/dashboard/admin'
-    },
-    { 
-      label: 'User Management', 
-      path: '/dashboard/admin/user-management', 
-      icon: <People />,
-      onClick: () => window.location.href = '/dashboard/admin/user-management'
-    },
-    { 
-      label: 'User List', 
-      path: '/dashboard/admin/user-list', 
-      icon: <People />,
-      onClick: () => window.location.href = '/dashboard/admin/user-list'
-    },
-    { 
-      label: 'Settings', 
-      path: '/dashboard/admin/settings', 
-      icon: <Settings />,
-      onClick: () => window.location.href = '/dashboard/admin/settings'
-    },
-    { 
-      label: 'Logout', 
-      path: '/login?user=admin', 
-      icon: <ExitToApp />,
-      onClick: () => {
-        logout();
-        window.location.href = '/login?user=admin';
-      },
-      style: {
-        icon: { color: '#d32f2f' },
-        text: {
-          '& .MuiTypography-root': {
-            color: '#d32f2f',
-            fontSize: '0.9rem',
-          },
+  // Fetch users from backend
+  useEffect(() => {
+    debouncedFetchUsers(searchTerm, pagination.page);
+    return () => {
+      debouncedFetchUsers.cancel();
+    };
+  }, [searchTerm, pagination.page, debouncedFetchUsers]);
+
+  const fetchUsers = async (search = '', page = 1) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/users?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${user?.token}`
+          }
         }
-      }
+      );
+      if (!response.ok) throw new Error('Failed to fetch users');
+      const data = await response.json();
+      setUsers(data.users);
+      setPagination(prev => ({
+        ...prev,
+        total: data.pagination.total,
+        pages: data.pagination.pages,
+        page
+      }));
+    } catch (err) {
+      setError('Failed to fetch users');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  // Handle page change
+  const handlePageChange = (event, newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  // Handle search change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setPagination(prev => ({ ...prev, page: 1 })); // Reset to first page on search
+  };
 
   // Filter users based on search term
   const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Handle user status change
-  const handleStatusChange = (id, newStatus) => {
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, status: newStatus } : user
-    ));
-  };
-
-  // Toggle password visibility
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const handleStatusChange = async (email, newStatus) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/users/update-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`
+        },
+        body: JSON.stringify({ email, accountStatus: newStatus })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to update status');
+      setSuccess(`Account status updated to ${newStatus}`);
+      fetchUsers();
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   // Open edit dialog
-  const handleEditClick = (user) => {
-    setEditingUser(user);
+  const handleEditClick = (userObj) => {
+    setEditingUser(userObj);
     setEditFormData({
-      name: user.name,
-      email: user.email,
-      password: '', // Initialize with empty password
-      role: user.role,
-      status: user.status
+      fullName: userObj.fullName,
+      email: userObj.email,
+      role: userObj.role,
+      accountStatus: userObj.accountStatus
     });
     setEditDialogOpen(true);
-    setShowPassword(false); // Reset password visibility
   };
 
   // Close edit dialog
@@ -170,256 +154,230 @@ const UserList = () => {
   };
 
   // Save edited user
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingUser) {
-      // Validate required fields
-      if (!editFormData.name || !editFormData.email) {
-        alert('Name and email are required fields.');
-        return;
+      try {
+        const response = await fetch(`http://localhost:5000/api/users/${editingUser._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user?.token}`
+          },
+          body: JSON.stringify(editFormData)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to update user');
+        setSuccess('User updated successfully!');
+        fetchUsers();
+        handleCloseEditDialog();
+      } catch (err) {
+        setError(err.message);
       }
-
-      // Update user in the list
-      const updatedUsers = users.map(user => 
-        user.id === editingUser.id ? 
-        { ...user, 
-          name: editFormData.name,
-          email: editFormData.email,
-          // Only update password if it was changed
-          ...(editFormData.password ? { password: editFormData.password } : {}),
-          role: editFormData.role,
-          status: editFormData.status 
-        } : user
-      );
-      
-      setUsers(updatedUsers);
-      handleCloseEditDialog();
-      
-      // Show success message (in a real app, you might use a snackbar)
-      alert(`User ${editFormData.name} updated successfully!`);
     }
   };
 
-  // Handle user deletion
-  const handleDeleteUser = (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== id));
+  // Delete user
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    try {
+      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${user?.token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to delete user');
+      setSuccess('User deleted successfully!');
+      fetchUsers();
+    } catch (err) {
+      setError(err.message);
     }
   };
+
+  // Consistent menuItems structure
+  const menuItems = [
+    { 
+      label: 'Dashboard', 
+      path: '/dashboard/admin',
+      icon: <Dashboard />, onClick: () => navigate('/dashboard/admin')
+    },
+    { 
+      label: 'User Management', 
+      path: '/dashboard/admin/user-management', 
+      icon: <People />, onClick: () => navigate('/dashboard/admin/user-management')
+    },
+    { 
+      label: 'User List', 
+      path: '/dashboard/admin/user-list', 
+      icon: <People />, onClick: () => navigate('/dashboard/admin/user-list')
+    },
+    { 
+      label: 'Settings', 
+      path: '/dashboard/admin/settings', 
+      icon: <Settings />, onClick: () => navigate('/dashboard/admin/settings')
+    },
+    { 
+      label: 'Logout', 
+      path: '/login?user=admin', 
+      icon: <ExitToApp />, onClick: () => { logout(); navigate('/login?user=admin'); },
+      style: {
+        icon: { color: '#d32f2f' },
+        text: {
+          '& .MuiTypography-root': {
+            color: '#d32f2f', fontSize: '0.9rem',
+          },
+        }
+      }
+    }
+  ];
 
   return (
-    <DashboardLayout menuItems={menuItems} title="Admin Portal">
-      <div style={{ padding: '20px' }}>
-        <Typography variant="h4" style={{ marginBottom: '20px' }}>
-          User List
+    <DashboardLayout menuItems={menuItems}>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          User Management
         </Typography>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <TextField
-            variant="outlined"
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '60%' }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={() => navigate('/dashboard/admin/user-management')}
-          >
-            Add New User
-          </Button>
-        </div>
+        {/* Search field */}
+        <TextField
+          fullWidth
+          margin="normal"
+          variant="outlined"
+          placeholder="Search users..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
 
-        <TableContainer component={Paper} style={{ marginTop: '20px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+        {/* Loading state */}
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        )}
+
+        {/* Error message */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Success message */}
+        {success && (
+          <Alert severity="success" sx={{ mt: 2 }}>
+            {success}
+          </Alert>
+        )}
+
+        {/* Users table */}
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
           <Table>
-            <TableHead style={{ backgroundColor: '#f5f5f5' }}>
+            <TableHead>
               <TableRow>
-                <TableCell><strong>User</strong></TableCell>
-                <TableCell><strong>Email</strong></TableCell>
-                <TableCell><strong>Role</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Last Login</strong></TableCell>
-                <TableCell><strong>Actions</strong></TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Role</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredUsers.map((user) => (
-                <TableRow key={user.id} hover>
-                  <TableCell>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar style={{ marginRight: '10px', backgroundColor: user.role === 'Admin' ? '#1976d2' : user.role === 'Physician' ? '#9c27b0' : '#2e7d32' }}>
-                        {user.name.charAt(0)}
-                      </Avatar>
-                      <span>{user.name}</span>
-                    </div>
-                  </TableCell>
+                <TableRow key={user._id}>
+                  <TableCell>{user.fullName}</TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.role}</TableCell>
                   <TableCell>
-                    <Chip 
-                      label={user.role} 
-                      color={
-                        user.role === 'Admin' ? 'primary' : 
-                        user.role === 'Physician' ? 'secondary' : 
-                        'default'
-                      }
-                      size="small"
+                    <Chip
+                      label={user.accountStatus}
+                      color={user.accountStatus === 'active' ? 'success' : 'error'}
                     />
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={user.status} 
-                      color={user.status === 'Active' ? 'success' : 'error'}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>{user.lastLogin}</TableCell>
-                  <TableCell>
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                      <IconButton 
-                        color="primary" 
-                        size="small"
-                        onClick={() => handleEditClick(user)}
-                      >
-                        <Edit />
-                      </IconButton>
-                      {user.status === 'Active' ? (
-                        <IconButton 
-                          color="error" 
-                          size="small"
-                          onClick={() => handleStatusChange(user.id, 'Inactive')}
-                        >
-                          <Block />
-                        </IconButton>
-                      ) : (
-                        <IconButton 
-                          color="success" 
-                          size="small"
-                          onClick={() => handleStatusChange(user.id, 'Active')}
-                        >
-                          <Check />
-                        </IconButton>
-                      )}
-                      <IconButton 
-                        color="error" 
-                        size="small"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Delete />
-                      </IconButton>
-                    </div>
+                    <IconButton onClick={() => handleEditClick(user)}>
+                      <Edit />
+                    </IconButton>
+                    <IconButton onClick={() => handleDeleteUser(user._id)}>
+                      <Delete />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
-      </div>
 
-      {/* Edit User Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Edit style={{ marginRight: '10px' }} />
-            Edit User
-          </div>
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            margin="dense"
-            label="Full Name"
-            name="name"
-            value={editFormData.name}
-            onChange={handleEditFormChange}
-            fullWidth
-            variant="outlined"
-            style={{ marginBottom: '16px', marginTop: '16px' }}
-          />
-          <TextField
-            margin="dense"
-            label="Email Address"
-            name="email"
-            type="email"
-            value={editFormData.email}
-            onChange={handleEditFormChange}
-            fullWidth
-            variant="outlined"
-            style={{ marginBottom: '16px' }}
-          />
-          <TextField
-            margin="dense"
-            label="Password"
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            value={editFormData.password}
-            onChange={handleEditFormChange}
-            fullWidth
-            variant="outlined"
-            style={{ marginBottom: '16px' }}
-            placeholder="Enter new password (leave empty to keep current)"
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={handleTogglePasswordVisibility}
-                    edge="end"
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-          <FormControl fullWidth variant="outlined" style={{ marginBottom: '16px' }}>
-            <InputLabel>Role</InputLabel>
-            <Select
-              label="Role"
-              name="role"
-              value={editFormData.role}
-              onChange={handleEditFormChange}
-            >
-              <MenuItem value="Admin">Admin</MenuItem>
-              <MenuItem value="Physician">Physician</MenuItem>
-              <MenuItem value="Patient">Patient</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth variant="outlined">
-            <InputLabel>Status</InputLabel>
-            <Select
-              label="Status"
-              name="status"
-              value={editFormData.status}
-              onChange={handleEditFormChange}
-            >
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Inactive">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={handleCloseEditDialog} 
-            color="secondary"
-            startIcon={<Cancel />}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSaveEdit} 
+        {/* Pagination */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Pagination
+            count={pagination.pages}
+            page={pagination.page}
+            onChange={handlePageChange}
             color="primary"
-            variant="contained"
-            startIcon={<Save />}
-          >
-            Save Changes
-          </Button>
-        </DialogActions>
-      </Dialog>
+          />
+        </Box>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialogOpen} onClose={handleCloseEditDialog}>
+          <DialogTitle>Edit User</DialogTitle>
+          <DialogContent>
+            <TextField
+              margin="dense"
+              label="Full Name"
+              name="fullName"
+              value={editFormData.fullName}
+              onChange={handleEditFormChange}
+              fullWidth
+            />
+            <TextField
+              margin="dense"
+              label="Email"
+              name="email"
+              value={editFormData.email}
+              onChange={handleEditFormChange}
+              fullWidth
+            />
+            <FormControl fullWidth margin="dense">
+              <InputLabel>Role</InputLabel>
+              <Select
+                name="role"
+                value={editFormData.role}
+                onChange={handleEditFormChange}
+                label="Role"
+              >
+                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="physician">Physician</MenuItem>
+                <MenuItem value="patient">Patient</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth margin="dense">
+              <InputLabel>Status</InputLabel>
+              <Select
+                name="accountStatus"
+                value={editFormData.accountStatus}
+                onChange={handleEditFormChange}
+                label="Status"
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+                <MenuItem value="suspended">Suspended</MenuItem>
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEditDialog}>Cancel</Button>
+            <Button onClick={handleSaveEdit} variant="contained" color="primary">Save</Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
     </DashboardLayout>
   );
 };

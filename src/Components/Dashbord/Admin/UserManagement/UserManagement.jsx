@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
-  Card, CardContent, Typography, Grid, TextField, Button, MenuItem, Container, ListItemIcon, ListItemText 
+  Card, CardContent, Typography, Grid, TextField, Button, MenuItem, Container, ListItemIcon, ListItemText,
+  Alert, Snackbar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from "@mui/material";
 import { AccountCircle, Settings, ExitToApp, VpnKey, Person, Dashboard, People, CalendarToday, Assessment, CheckCircle } from "@mui/icons-material";
 import DashboardLayout from "../../DasboardLayout";
@@ -16,18 +17,28 @@ const UserManagement = () => {
     role: "",
   });
 
+  const [users, setUsers] = useState([]);
   const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showSnackbar, setShowSnackbar] = useState(false);
   
   // Account activation states
   const [activationData, setActivationData] = useState({
     email: "",
-    accountStatus: "active" // Default status
+    accountStatus: "active"
   });
   const [accountError, setAccountError] = useState("");
   const [activationSuccess, setActivationSuccess] = useState(false);
 
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  // Check if user is admin
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login?user=admin');
+    }
+  }, [user, navigate]);
 
   // Handle input change
   const handleChange = (e) => {
@@ -35,17 +46,52 @@ const UserManagement = () => {
   };
 
   // Handle account creation
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError("");
+    setSuccessMessage("");
 
-    // Validation
-    if (!userData.fullName || !userData.username || !userData.email || !userData.password || !userData.role) {
-      setFormError("All fields are required!");
-      return;
+    try {
+      // Validation
+      if (!userData.fullName || !userData.username || !userData.email || !userData.password || !userData.role) {
+        setFormError("All fields are required!");
+        return;
+      }
+
+      if (userData.password.length < 6) {
+        setFormError("Password must be at least 6 characters long!");
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify(userData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to create user');
+      }
+
+      setSuccessMessage("User created successfully!");
+      setShowSnackbar(true);
+      
+      // Reset form
+      setUserData({
+        fullName: "",
+        username: "",
+        email: "",
+        password: "",
+        role: "",
+      });
+    } catch (error) {
+      setFormError(error.message);
     }
-
-    setFormError(""); // Clear errors
-    console.log("Creating User:", userData);
   };
 
   // Handle activation data changes
@@ -55,41 +101,50 @@ const UserManagement = () => {
       [e.target.name]: e.target.value
     });
     
-    // Clear any previous success message when form is being edited
     if (activationSuccess) {
       setActivationSuccess(false);
     }
   };
 
-  // Handle account activation
-  const handleAccountAction = (e) => {
+  // Handle account activation/deactivation
+  const handleAccountAction = async (e) => {
     e.preventDefault();
-
-    // Validate form
-    if (!activationData.email) {
-      setAccountError("Please enter a valid email address.");
-      return;
-    }
-
-    // Clear errors
     setAccountError("");
-    
-    // Simulate successful activation
-    console.log("Account action:", {
-      email: activationData.email,
-      status: activationData.accountStatus
-    });
-    
-    // Show success message
-    setActivationSuccess(true);
-    
-    // Reset form after successful submission
-    setTimeout(() => {
+    setActivationSuccess(false);
+
+    try {
+      if (!activationData.email) {
+        setAccountError("Please enter a valid email address.");
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/users/update-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify(activationData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update account status');
+      }
+
+      setActivationSuccess(true);
+      setSuccessMessage(`Account successfully ${activationData.accountStatus === "active" ? "activated" : "deactivated"}!`);
+      setShowSnackbar(true);
+      
+      // Reset form after successful submission
       setActivationData({
         email: "",
         accountStatus: "active"
       });
-    }, 3000);
+    } catch (error) {
+      setAccountError(error.message);
+    }
   };
 
   // Consistent menuItems structure
@@ -134,12 +189,11 @@ const UserManagement = () => {
 
   return (
     <DashboardLayout menuItems={menuItems}>
-      {/* <Typography variant="h4" paddingTop={20} paddingBottom={5} sx={headerStyle}>User Management</Typography> */}
-
       <Container>
         <Typography variant="h4" gutterBottom>
           User Management
         </Typography>
+
         <Grid container spacing={4}>
           {/* Create User Account Card */}
           <Grid item xs={12} md={6}>
@@ -148,10 +202,40 @@ const UserManagement = () => {
                 <Typography variant="h5" sx={cardTitleStyle}>Create User Account</Typography>
                 {formError && <Typography sx={errorStyle}>{formError}</Typography>}
                 <form onSubmit={handleSubmit} style={{ marginTop: "10px" }}>
-                  <TextField label="Full Name" name="fullName" value={userData.fullName} onChange={handleChange} fullWidth sx={inputStyle} />
-                  <TextField label="Username" name="username" value={userData.username} onChange={handleChange} fullWidth sx={inputStyle} />
-                  <TextField label="Email" name="email" type="email" value={userData.email} onChange={handleChange} fullWidth sx={inputStyle} />
-                  <TextField label="Password" name="password" type="password" value={userData.password} onChange={handleChange} fullWidth sx={inputStyle} />
+                  <TextField 
+                    label="Full Name" 
+                    name="fullName" 
+                    value={userData.fullName} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    sx={inputStyle} 
+                  />
+                  <TextField 
+                    label="Username" 
+                    name="username" 
+                    value={userData.username} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    sx={inputStyle} 
+                  />
+                  <TextField 
+                    label="Email" 
+                    name="email" 
+                    type="email" 
+                    value={userData.email} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    sx={inputStyle} 
+                  />
+                  <TextField 
+                    label="Password" 
+                    name="password" 
+                    type="password" 
+                    value={userData.password} 
+                    onChange={handleChange} 
+                    fullWidth 
+                    sx={inputStyle} 
+                  />
                   <TextField
                     select
                     label="Role"
@@ -161,8 +245,8 @@ const UserManagement = () => {
                     fullWidth
                     sx={inputStyle}
                   >
-                    <MenuItem value="Patient">Patient</MenuItem>
-                    <MenuItem value="Physician">Physician</MenuItem>
+                    <MenuItem value="patient">Patient</MenuItem>
+                    <MenuItem value="physician">Physician</MenuItem>
                   </TextField>
                   <Button type="submit" sx={buttonStyle}>Create Account</Button>
                 </form>
@@ -177,15 +261,7 @@ const UserManagement = () => {
                 <Typography variant="h5" sx={cardTitleStyle}>Account Activation Management</Typography>
                 {accountError && <Typography sx={errorStyle}>{accountError}</Typography>}
                 {activationSuccess && (
-                  <Typography sx={{
-                    color: "#4caf50",
-                    backgroundColor: "rgba(76, 175, 80, 0.1)",
-                    padding: "10px",
-                    borderRadius: "8px",
-                    textAlign: "center",
-                    marginBottom: "15px",
-                    fontWeight: "500"
-                  }}>
+                  <Typography sx={successStyle}>
                     Account successfully {activationData.accountStatus === "active" ? "activated" : "deactivated"}!
                   </Typography>
                 )}
@@ -228,6 +304,21 @@ const UserManagement = () => {
           </Grid>
         </Grid>
       </Container>
+
+      <Snackbar 
+        open={showSnackbar} 
+        autoHideDuration={6000} 
+        onClose={() => setShowSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setShowSnackbar(false)} 
+          severity="success" 
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </DashboardLayout>
   );
 };
@@ -296,6 +387,16 @@ const errorStyle = {
   fontSize: "0.9rem",
   textAlign: "center",
   marginBottom: "10px",
+};
+
+const successStyle = {
+  color: "#4caf50",
+  backgroundColor: "rgba(76, 175, 80, 0.1)",
+  padding: "10px",
+  borderRadius: "8px",
+  textAlign: "center",
+  marginBottom: "15px",
+  fontWeight: "500"
 };
 
 export default UserManagement;

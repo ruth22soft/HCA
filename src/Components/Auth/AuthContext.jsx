@@ -23,30 +23,37 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Function to log in a user
-  const login = (userData) => {
-    return new Promise((resolve) => {
-      console.log('Login function called with:', userData);
-      
-      // Set the user in state
+  // Function to log in a user via the backend API
+  const login = async (email, password, role) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, role }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const data = await response.json();
+      const userData = { ...data.user, token: data.token };
       setUser(userData);
-      
-      // Store in localStorage
       localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Return the user data
-      resolve(userData);
-    });
+      return userData;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   // Function to log out a user
   const logout = () => {
     console.log('Logout function called');
-    
-    // Clear user from state
     setUser(null);
-    
-    // Remove from localStorage
     localStorage.removeItem('user');
   };
 

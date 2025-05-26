@@ -111,144 +111,78 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // Get credentials from form
-      const { email, password } = formData;
-      console.log('Attempting login with:', { email, password });
+      const { email, password, userType } = formData;
+      console.log('Attempting login with:', { email, password, userType });
       
-      // Validate credentials
-      const user = await validateCredentials(email, password);
+      const userData = await login(email, password, userType);
+      console.log('Login successful:', userData);
       
-      if (!user) {
-        console.error('Authentication failed: Invalid credentials');
-        setError('Invalid username or password');
-        setLoading(false);
-        return;
-      }
-      
-      console.log('Authentication successful:', user);
-      
-      // Determine dashboard path based on user role
-      let dashboardPath;
-      switch (user.role) {
-        case 'physician':
-          dashboardPath = '/dashboard/physician';
-          break;
-        case 'admin':
-          dashboardPath = '/dashboard/admin';
-          break;
-        case 'patient':
-          dashboardPath = '/dashboard/patient';
-          break;
-        default:
-          setError('Invalid user role');
-          setLoading(false);
-          return;
-      }
-      
-      // Login the user (store in context and localStorage)
-      await login(user);
-      
-      console.log('Login successful, redirecting to:', dashboardPath);
-      
-      // Direct navigation to dashboard
+      // Redirect to the appropriate dashboard based on user role
+      const dashboardPath = `/dashboard/${userData.role.toLowerCase()}`;
       window.location.href = dashboardPath;
     } catch (error) {
       console.error('Login error:', error);
-      setError('An error occurred during login');
+      setError(error.message || 'An error occurred during login');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }} className="container">
-      {/* Header */}
-      <Box textAlign="center" mb={4}>
-        <Box sx={{ color: currentUserType.color, mb: 2 }}>
+    <Container component="main" maxWidth="xs">
+      <Paper elevation={3} sx={{ p: 4, mt: 8 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {currentUserType.icon}
+          <Typography variant="h5" component="h1" sx={{ mt: 2, color: currentUserType.color }}>
+            {currentUserType.title}
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+            {currentUserType.subtitle}
+          </Typography>
+          <Chip 
+            label={selectedUserType.toUpperCase()} 
+            color={currentUserType.chipColor} 
+            sx={{ mb: 2 }} 
+          />
         </Box>
-        <Typography variant="h4" gutterBottom>
-          {currentUserType.title}
-        </Typography>
-        <Typography variant="subtitle1" gutterBottom>
-          {currentUserType.subtitle}
-        </Typography>
-        <Chip 
-          label={`${selectedUserType.charAt(0).toUpperCase() + selectedUserType.slice(1)} Access`}
-          color={currentUserType.chipColor}
-          sx={{ mt: 1 }}
-        />
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {/* Login Form */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 4, 
-          borderRadius: '16px', 
-          maxWidth: '400px', 
-          mx: 'auto',
-          borderTop: `4px solid ${currentUserType.color}`
-        }} 
-        className="paper"
-      >
         <form onSubmit={handleSubmit}>
           <TextField
-            fullWidth
             margin="normal"
+            required
+            fullWidth
+            id="email"
             label="Email Address"
-            type="email"
             name="email"
+            autoComplete="email"
+            autoFocus
             value={formData.email}
             onChange={handleChange}
-            required
-            autoComplete="email"
           />
           <TextField
-            fullWidth
             margin="normal"
+            required
+            fullWidth
+            name="password"
             label="Password"
             type="password"
-            name="password"
+            id="password"
+            autoComplete="current-password"
             value={formData.password}
             onChange={handleChange}
-            required
-            autoComplete="current-password"
           />
           <Button
             type="submit"
-            variant="contained"
             fullWidth
-            sx={{ 
-              mt: 3,
-              backgroundColor: currentUserType.color,
-              '&:hover': {
-                backgroundColor: currentUserType.color,
-                opacity: 0.9
-              }
-            }}
+            variant="contained"
+            sx={{ mt: 3, mb: 2, bgcolor: currentUserType.color }}
             disabled={loading}
           >
             {loading ? 'Logging in...' : 'Login'}
           </Button>
         </form>
-
-        {/* Forgot Password Message */}
-        <Box textAlign="right" mt={2}>
-          <Button
-            color="primary"
-            onClick={() => setShowForgotMessage(!showForgotMessage)}
-            sx={{ textTransform: 'none' }}
-          >
-            Forgot Password?
-          </Button>
-        </Box>
 
         {showForgotMessage && (
           <Alert 
@@ -264,7 +198,6 @@ const Login = () => {
           </Alert>
         )}
 
-        {/* Back to Home - Only show for patient login */}
         {selectedUserType === 'patient' && (
           <Box textAlign="center" mt={3}>
             <Button

@@ -216,6 +216,18 @@ const LoginMenu = () => {
         open={open}
         onClose={handleClose}
       >
+        <MenuItem onClick={() => handleLogin('admin')}>
+          <ListItemIcon>
+            <AdminPanelSettings />
+          </ListItemIcon>
+          <ListItemText>Admin Login</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleLogin('physician')}>
+          <ListItemIcon>
+            <MedicalServices />
+          </ListItemIcon>
+          <ListItemText>Physician Login</ListItemText>
+        </MenuItem>
         <MenuItem onClick={() => handleLogin('patient')}>
           <ListItemIcon>
             <PersonOutline />
