@@ -20,6 +20,7 @@ import ApproveRecommendations from './Components/Dashbord/Physician/ApproveRecom
 import ViewPatients from './Components/Dashbord/Physician/ViewPatients';
 import ViewAppointments from './Components/Dashbord/Physician/ViewAppointments';
 import UpdatePatient from './Components/Dashbord/Physician/UpdatePatient';
+import RegisterPatient from './Components/Dashbord/Physician/RegisterPatient';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -96,12 +97,16 @@ function App() {
                 <Route path="approve-recommendations" element={<ApproveRecommendations />} />
                 <Route path="view-patients" element={<ViewPatients />} />
                 <Route path="view-appointments" element={<ViewAppointments />} />
+                <Route path="register-patient" element={<RegisterPatient />} />
                 <Route path="update-patient" element={<UpdatePatient />} />
               </Routes>
             } />
           </Routes>
         </ProtectedRoute>
       } />
+
+      {/* Redirect /patients to the correct dashboard route */}
+      <Route path="/patients" element={<Navigate to="/dashboard/physician/view-patients" replace />} />
 
       {/* Catch all route */}
       <Route

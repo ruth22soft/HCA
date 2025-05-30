@@ -13,6 +13,9 @@ import DashboardLayout from '../../DasboardLayout';
 import { useAuth } from '../../../Auth/AuthContext';
 import debounce from 'lodash/debounce';
 
+// API URL configuration
+const API_BASE_URL = 'http://localhost:5000';
+
 const UserList = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -51,35 +54,64 @@ const UserList = () => {
 
   // Fetch users from backend
   useEffect(() => {
+    if (!user?.token) return;
+    if (user.role !== 'admin') {
+      setError('Access denied. Only admins can view all users.');
+      setLoading(false);
+      return;
+    }
     debouncedFetchUsers(searchTerm, pagination.page);
     return () => {
       debouncedFetchUsers.cancel();
     };
-  }, [searchTerm, pagination.page, debouncedFetchUsers]);
+  }, [searchTerm, pagination.page, debouncedFetchUsers, user?.token, user?.role]);
 
   const fetchUsers = async (search = '', page = 1) => {
+    if (!user?.token) {
+      setError('No authentication token available');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
+      console.log('Fetching users with token:', user.token);
       const response = await fetch(
-        `http://localhost:5000/api/users?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}`,
+        `${API_BASE_URL}/api/users?page=${page}&limit=${pagination.limit}&search=${encodeURIComponent(search)}`,
         {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${user?.token}`
-          }
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
         }
       );
-      if (!response.ok) throw new Error('Failed to fetch users');
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      setUsers(data.users);
+      console.log('Received users data:', data);
+      
+      setUsers(data.data || []);
       setPagination(prev => ({
         ...prev,
-        total: data.pagination.total,
-        pages: data.pagination.pages,
+        total: data.pagination?.total || 0,
+        pages: data.pagination?.pages || 0,
         page
       }));
     } catch (err) {
-      setError('Failed to fetch users');
+      console.error('Error fetching users:', err);
+      setError(`Failed to fetch users: ${err.message}`);
+      setUsers([]);
+      setPagination(prev => ({
+        ...prev,
+        total: 0,
+        pages: 0
+      }));
     } finally {
       setLoading(false);
     }
@@ -108,20 +140,40 @@ const UserList = () => {
 
   // Handle user status change
   const handleStatusChange = async (email, newStatus) => {
+    if (!user?.token) {
+      setError('No authentication token available');
+      return;
+    }
+
     try {
-      const response = await fetch('http://localhost:5000/api/users/update-status', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user?.token}`
-        },
-        body: JSON.stringify({ email, accountStatus: newStatus })
-      });
+      const userToUpdate = users.find(u => u.email === email);
+      if (!userToUpdate) {
+        throw new Error('User not found');
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/users/${userToUpdate.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({ accountStatus: newStatus })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to update status');
       setSuccess(`Account status updated to ${newStatus}`);
       fetchUsers();
     } catch (err) {
+      console.error('Error updating user status:', err);
       setError(err.message);
     }
   };
@@ -155,22 +207,37 @@ const UserList = () => {
 
   // Save edited user
   const handleSaveEdit = async () => {
+    if (!user?.token) {
+      setError('No authentication token available');
+      return;
+    }
+
     if (editingUser) {
       try {
-        const response = await fetch(`http://localhost:5000/api/users/${editingUser._id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user?.token}`
-          },
-          body: JSON.stringify(editFormData)
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/api/users/${editingUser.id}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.token}`
+            },
+            credentials: 'include',
+            body: JSON.stringify(editFormData)
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to update user');
         setSuccess('User updated successfully!');
         fetchUsers();
         handleCloseEditDialog();
       } catch (err) {
+        console.error('Error updating user:', err);
         setError(err.message);
       }
     }
@@ -178,19 +245,35 @@ const UserList = () => {
 
   // Delete user
   const handleDeleteUser = async (id) => {
+    if (!user?.token) {
+      setError('No authentication token available');
+      return;
+    }
+
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${user?.token}`
+      const response = await fetch(
+        `${API_BASE_URL}/api/users/${id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
         }
-      });
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to delete user');
       setSuccess('User deleted successfully!');
       fetchUsers();
     } catch (err) {
+      console.error('Error deleting user:', err);
       setError(err.message);
     }
   };
@@ -291,7 +374,7 @@ const UserList = () => {
             </TableHead>
             <TableBody>
               {filteredUsers.map((user) => (
-                <TableRow key={user._id}>
+                <TableRow key={user.id}>
                   <TableCell>{user.fullName}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.role}</TableCell>
@@ -305,7 +388,7 @@ const UserList = () => {
                     <IconButton onClick={() => handleEditClick(user)}>
                       <Edit />
                     </IconButton>
-                    <IconButton onClick={() => handleDeleteUser(user._id)}>
+                    <IconButton onClick={() => handleDeleteUser(user.id)}>
                       <Delete />
                     </IconButton>
                   </TableCell>

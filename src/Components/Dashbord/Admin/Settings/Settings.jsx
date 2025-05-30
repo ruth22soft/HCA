@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import {
@@ -44,14 +44,13 @@ import { useAuth } from '../../../Auth/AuthContext';
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const fileInputRef = useRef(null);
 
   const [personalInfo, setPersonalInfo] = useState({
-    fullName: 'Admin User',
-    email: 'admin@example.com',
-    phone: '+251912345678',
-    role: 'Administrator'
+    fullName: '',
+    email: '',
+    role: ''
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -78,13 +77,38 @@ const Settings = () => {
   const [errors, setErrors] = useState({
     fullName: '',
     email: '',
-    phone: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
   const [isUploading, setIsUploading] = useState(false);
+
+  // Fetch latest user info on mount
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/users/${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data.data) {
+          setPersonalInfo({
+            fullName: data.data.fullName,
+            email: data.data.email,
+            role: data.data.role
+          });
+        }
+      } catch (error) {
+        // Optionally handle error
+      }
+    };
+    if (user?.id && user?.token) {
+      fetchUserInfo();
+    }
+  }, [user]);
 
   const handlePersonalInfoChange = (e) => {
     const { name, value } = e.target;
@@ -214,15 +238,6 @@ const Settings = () => {
         }
         break;
 
-      case 'phone':
-        const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-        if (!value) {
-          errorMessage = 'Phone number is required';
-        } else if (!phoneRegex.test(value)) {
-          errorMessage = 'Please enter a valid phone number';
-        }
-        break;
-
       case 'currentPassword':
         if (!value) {
           errorMessage = 'Current password is required';
@@ -264,8 +279,7 @@ const Settings = () => {
 
     if (type === 'Personal information') {
       isValid = validateField('fullName', personalInfo.fullName) &&
-                validateField('email', personalInfo.email) &&
-                validateField('phone', personalInfo.phone);
+                validateField('email', personalInfo.email);
     } else if (type === 'Password') {
       isValid = validateField('currentPassword', passwordData.currentPassword) &&
                 validateField('newPassword', passwordData.newPassword) &&
@@ -275,13 +289,72 @@ const Settings = () => {
     return isValid;
   };
 
-  const handleSubmit = (type) => {
+  const handleSubmit = async (type) => {
     if (validateForm(type)) {
-      setAlert({
-        show: true,
-        message: `${type} updated successfully!`,
-        type: 'success'
-      });
+      if (type === 'Personal information') {
+        try {
+          const response = await fetch(`http://localhost:5000/api/users/${user.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({
+              fullName: personalInfo.fullName,
+              email: personalInfo.email
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to update profile');
+          }
+          setAlert({
+            show: true,
+            message: 'Profile updated successfully!',
+            type: 'success'
+          });
+        } catch (error) {
+          setAlert({
+            show: true,
+            message: error.message,
+            type: 'error'
+          });
+        }
+      } else if (type === 'Password') {
+        try {
+          const response = await fetch('http://localhost:5000/api/users/reset-password', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${user.token}`
+            },
+            body: JSON.stringify({
+              email: personalInfo.email,
+              newPassword: passwordData.newPassword
+            })
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || 'Failed to update password');
+          }
+          setAlert({
+            show: true,
+            message: 'Password updated successfully!',
+            type: 'success'
+          });
+          setPasswordData({
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          });
+        } catch (error) {
+          setAlert({
+            show: true,
+            message: error.message,
+            type: 'error'
+          });
+        }
+      }
       setTimeout(() => setAlert({ show: false, message: '', type: 'success' }), 3000);
     } else {
       setAlert({
@@ -386,10 +459,13 @@ const Settings = () => {
                 </Box>
                 <Box display="flex" flexDirection="column" alignItems="center">
                   <Typography variant="h5" mt={2}>
-                    {personalInfo.fullName}
+                    {user?.fullName}
                   </Typography>
                   <Typography variant="subtitle1" color="textSecondary">
-                    {personalInfo.role}
+                    {user?.role}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {user?.email}
                   </Typography>
                 </Box>
                 <Grid container spacing={2} sx={{ mt: 2 }}>
@@ -413,17 +489,6 @@ const Settings = () => {
                       onChange={handlePersonalInfoChange}
                       error={!!errors.email}
                       helperText={errors.email}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Phone Number"
-                      name="phone"
-                      value={personalInfo.phone}
-                      onChange={handlePersonalInfoChange}
-                      error={!!errors.phone}
-                      helperText={errors.phone}
                     />
                   </Grid>
                 </Grid>

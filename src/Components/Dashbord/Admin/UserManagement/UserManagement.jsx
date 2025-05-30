@@ -63,7 +63,7 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('http://localhost:5000/api/users', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,13 +118,34 @@ const UserManagement = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/users/update-status', {
-        method: 'PUT',
+      // 1. Fetch all users (or use your existing users state)
+      let userList = users;
+      if (!userList.length) {
+        // If users are not loaded, fetch them
+        const response = await fetch('http://localhost:5000/api/users', {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        const data = await response.json();
+        userList = data.data || [];
+      }
+
+      // 2. Find the user by email
+      const userToUpdate = userList.find(u => u.email === activationData.email);
+      if (!userToUpdate) {
+        setAccountError("User not found with that email.");
+        return;
+      }
+
+      // 3. Update account status by ID
+      const response = await fetch(`http://localhost:5000/api/users/${userToUpdate.id}/status`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(activationData)
+        body: JSON.stringify({ status: activationData.accountStatus })
       });
 
       const data = await response.json();
@@ -136,7 +157,7 @@ const UserManagement = () => {
       setActivationSuccess(true);
       setSuccessMessage(`Account successfully ${activationData.accountStatus === "active" ? "activated" : "deactivated"}!`);
       setShowSnackbar(true);
-      
+
       // Reset form after successful submission
       setActivationData({
         email: "",
@@ -245,7 +266,7 @@ const UserManagement = () => {
                     fullWidth
                     sx={inputStyle}
                   >
-                    <MenuItem value="patient">Patient</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
                     <MenuItem value="physician">Physician</MenuItem>
                   </TextField>
                   <Button type="submit" sx={buttonStyle}>Create Account</Button>

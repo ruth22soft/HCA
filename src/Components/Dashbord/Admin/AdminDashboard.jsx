@@ -16,32 +16,44 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user?.token) return;
+    if (!user?.token) {
+      setError('No authentication token found. Please log in again.');
+      setLoading(false);
+      return;
+    }
 
     const controller = new AbortController();
+    let didCancel = false;
+    setLoading(true);
+    setError('');
+
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
     const fetchStats = async () => {
-      setLoading(true);
-      setError('');
       try {
-        const response = await fetch('http://localhost:5000/api/users/stats', {
-          headers: {
-            'Authorization': `Bearer ${user.token}`
-          },
+        const response = await fetch('http://localhost:5000/api/dashboard/admin-stats', {
+          headers: { 'Authorization': `Bearer ${user.token}` },
           signal: controller.signal
         });
-        if (!response.ok) throw new Error('Failed to fetch dashboard stats');
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Failed to fetch dashboard stats');
+        }
         const data = await response.json();
-        setStats(data);
+        if (!didCancel) {
+          setStats(data);
+          setError('');
+        }
       } catch (err) {
-        if (err.name === 'AbortError') {
-          setError('Request timed out. Please try again.');
-        } else {
-          setError(err.message || 'Failed to fetch dashboard stats');
+        if (!didCancel) {
+          if (err.name === 'AbortError') {
+            setError('Request timed out. Please try again.');
+          } else {
+            setError(err.message || 'Failed to fetch dashboard stats');
+          }
         }
       } finally {
-        setLoading(false);
+        if (!didCancel) setLoading(false);
         clearTimeout(timeoutId);
       }
     };
@@ -49,6 +61,7 @@ const AdminDashboard = () => {
     fetchStats();
 
     return () => {
+      didCancel = true;
       controller.abort();
       clearTimeout(timeoutId);
     };

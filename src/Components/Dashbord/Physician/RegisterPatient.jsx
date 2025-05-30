@@ -16,8 +16,9 @@ import { useAuth } from '../../Auth/AuthContext';
 const RegisterPatient = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const editingPatient = location.state?.patient || null;
+  console.log('Editing patient data:', editingPatient);
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -42,10 +43,14 @@ const RegisterPatient = () => {
     { label: 'Approve Recommendations', path: '/dashboard/physician/approve-recommendations', icon: <CheckCircle />, onClick: () => navigate('/dashboard/physician/approve-recommendations') },
     { label: 'View Patients', path: '/dashboard/physician/view-patients', icon: <People />, onClick: () => navigate('/dashboard/physician/view-patients') },
     { label: 'View Appointments', path: '/dashboard/physician/view-appointments', icon: <EventNote />, onClick: () => navigate('/dashboard/physician/view-appointments') },
-    { label: 'Register/Update Patient', path: '/dashboard/physician/update-patient', icon: <Edit />, onClick: () => navigate('/dashboard/physician/update-patient') }
+    { label: 'Register Patient', path: '/dashboard/physician/register-patient', icon: <Edit />, onClick: () => navigate('/dashboard/physician/register-patient') }
   ];
 
   useEffect(() => {
+    if (authLoading || !user?.token) {
+      console.log('Auth loading or no user token, skipping fetchPatientsAndGenerateId');
+      return;
+    }
     if (editingPatient) {
       setFormData({
         ...editingPatient,
@@ -57,12 +62,17 @@ const RegisterPatient = () => {
       const fetchPatientsAndGenerateId = async () => {
         setLoading(true);
         try {
-          const response = await fetch('http://localhost:5000/api/users', {
+          console.log('Fetching patients with token:', user.token);
+          const response = await fetch('http://localhost:5000/api/users/patients', {
             headers: { 'Authorization': `Bearer ${user.token}` }
           });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.message || 'Failed to fetch patients');
-          const patients = (data.data || []).filter(u => u.role === 'patient');
+          console.log('Response status:', response.status);
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            console.error('Error response from backend:', data);
+            throw new Error(data.message || 'Failed to fetch patients');
+          }
+          const patients = data.data || [];
           // Find max patientId number
           let maxNum = 0;
           patients.forEach(p => {
@@ -74,6 +84,7 @@ const RegisterPatient = () => {
           const nextId = 'PA' + String(maxNum + 1).padStart(2, '0');
           setFormData(f => ({ ...f, patientId: nextId }));
         } catch (err) {
+          console.error('Error in fetchPatientsAndGenerateId:', err);
           setError(err.message);
         } finally {
           setLoading(false);
@@ -81,7 +92,7 @@ const RegisterPatient = () => {
       };
       fetchPatientsAndGenerateId();
     }
-  }, [editingPatient, user.token]);
+  }, [authLoading, user?.token, editingPatient]);
 
   const handleChange = (e) => {
     setFormData({
@@ -92,15 +103,30 @@ const RegisterPatient = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (authLoading || !user?.token) {
+      setError('Authentication not ready. Please wait.');
+      return;
+    }
     setError('');
     setSuccess('');
     setLoading(true);
     try {
       const payload = {
-        ...formData,
+        fullName: formData.fullName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
         role: 'patient',
-        accountStatus: formData.status || 'active',
+        patientId: formData.patientId,
+        age: formData.age,
+        condition: formData.condition,
+        phone: formData.phone,
+        address: formData.address,
+        lastVisit: formData.lastVisit,
+        status: formData.status || 'Active',
+        accountStatus: 'active'
       };
+
       if (!editingPatient) {
         // Registration: require password
         if (!payload.password) throw new Error('Password is required for new patient registration');
@@ -113,12 +139,50 @@ const RegisterPatient = () => {
           body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to register patient');
+        if (!response.ok) {
+          console.error('Server response:', data);
+          throw new Error(data.message || 'Failed to register patient');
+        }
         setSuccess('Patient registered successfully!');
-        setFormData(f => ({ ...f, password: '' }));
+        // Reset form after successful registration
+        setFormData({
+          fullName: '',
+          username: '',
+          email: '',
+          password: '',
+          age: '',
+          condition: '',
+          lastVisit: '',
+          status: '',
+          phone: '',
+          address: '',
+          patientId: formData.patientId // Keep the same patientId format
+        });
+        // Fetch new patientId for next registration
+        const nextIdResponse = await fetch('http://localhost:5000/api/users/patients', {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const nextIdData = await nextIdResponse.json();
+        if (nextIdResponse.ok) {
+          const patients = nextIdData.data || [];
+          let maxNum = 0;
+          patients.forEach(p => {
+            if (p.patientId && /^PA\d+$/.test(p.patientId)) {
+              const num = parseInt(p.patientId.replace('PA', ''), 10);
+              if (num > maxNum) maxNum = num;
+            }
+          });
+          const nextId = 'PA' + String(maxNum + 1).padStart(2, '0');
+          setFormData(prev => ({ ...prev, patientId: nextId }));
+        }
       } else {
         // Update
-        const response = await fetch(`http://localhost:5000/api/users/${editingPatient._id}`, {
+        const patientId = editingPatient?._id;
+        console.log('Editing patient _id for update:', patientId);
+        if (!patientId) {
+          throw new Error('Invalid patient ID for update. Please try again.');
+        }
+        const response = await fetch(`http://localhost:5000/api/users/${patientId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -127,17 +191,25 @@ const RegisterPatient = () => {
           body: JSON.stringify(payload)
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to update patient');
+        if (!response.ok) {
+          console.error('Update response:', data);
+          throw new Error(data.message || 'Failed to update patient');
+        }
         setSuccess('Patient updated successfully!');
+        // Navigate back to patients list after successful update
+        setTimeout(() => {
+          navigate('/dashboard/physician/view-patients');
+        }, 1500);
       }
     } catch (err) {
+      console.error('Error in handleSubmit:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) return (
+  if (authLoading || loading || !user?.token) return (
     <DashboardLayout menuItems={menuItems} title="Physician Portal">
       <div>Loading...</div>
     </DashboardLayout>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -35,56 +35,61 @@ import {
   LocalHospital
 } from '@mui/icons-material';
 import DashboardLayout from '../DasboardLayout';
+import { useAuth } from '../../Auth/AuthContext';
 
 const ViewPatients = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Example patients data
-  const patients = [
-    {
-      id: "P123",
-      name: "Ab Doe",
-      age: 45,
-      gender: "Male",
-      condition: "Diabetes",
-      lastVisit: "2024-03-15",
-      status: "Active",
-      contact: "+1234567890",
-      email: "john@example.com",
-      address: "123 Main St, City",
-      medicalHistory: [
-        "Type 2 Diabetes diagnosed in 2020",
-        "Hypertension",
-        "Previous surgery in 2019"
-      ],
-      currentMedications: [
-        "Metformin 500mg",
-        "Lisinopril 10mg"
-      ]
-    },
-    {
-      id: "P124",
-      name: "Jane Smith",
-      age: 32,
-      gender: "Female",
-      condition: "Asthma",
-      lastVisit: "2024-03-18",
-      status: "Active",
-      contact: "+1234567891",
-      email: "jane@example.com",
-      address: "456 Oak St, City",
-      medicalHistory: [
-        "Asthma since childhood",
-        "Seasonal allergies"
-      ],
-      currentMedications: [
-        "Albuterol inhaler",
-        "Fluticasone"
-      ]
+  useEffect(() => {
+    if (authLoading || !user?.token) return;
+    const fetchPatients = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        console.log('Fetching patients with token:', user.token);
+        const response = await fetch('http://localhost:5000/api/users/patients', {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        if (!response.ok) {
+          console.error('Error response from backend:', data);
+          throw new Error(data.message || 'Failed to fetch patients');
+        }
+        console.log('Fetched patients:', data.data);
+        // Normalize patients to always have _id
+        const normalizedPatients = (data.data || []).map(p => ({
+          ...p,
+          _id: p._id || p.id
+        }));
+        setPatients(normalizedPatients);
+      } catch (err) {
+        console.error('Error in fetchPatients:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPatients();
+  }, [authLoading, user?.token]);
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        setSuccess('');
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  ];
+  }, [success]);
 
   const menuItems = [
     { 
@@ -124,32 +129,102 @@ const ViewPatients = () => {
       onClick: () => navigate('/dashboard/physician/view-appointments')
     },
     { 
-      label: 'Update Patient Data', 
-      path: '/dashboard/physician/update-patient', 
-      icon: <Edit />,
-      onClick: () => navigate('/dashboard/physician/update-patient')
+      label: 'Register/Update Patient', 
+      path: '/dashboard/physician/register-patient', 
+      icon: <Edit />, 
+      onClick: () => navigate('/dashboard/physician/register-patient') 
     }
   ];
 
   const handleViewDetails = (patient) => {
-    setSelectedPatient(patient);
+    console.log('Viewing patient:', patient);
+    setSelectedPatient({
+      ...patient,
+      medicalHistory: patient.medicalHistory || [],
+      currentMedications: patient.currentMedications || []
+    });
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setSelectedPatient(null);
   };
 
-  const handleUpdatePatient = (patientId) => {
-    navigate(`/dashboard/physician/update-patient`, { state: { patientId } });
+  const handleUpdatePatient = (patient) => {
+    console.log('Updating patient:', patient);
+    if (!patient._id) {
+      setError('Invalid patient ID');
+      return;
+    }
+    navigate('/dashboard/physician/register-patient', { 
+      state: { patient } 
+    });
   };
+
+  const handleDeletePatient = async (patientId) => {
+    // Always use _id, even if passed id
+    const patientObj = patients.find(p => p._id === patientId || p.id === patientId);
+    const realId = patientObj?._id || patientObj?.id;
+    if (!realId) {
+      setError('Invalid patient ID');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete this patient?')) return;
+    try {
+      console.log('Attempting to delete patient with ID:', realId);
+      const response = await fetch(`http://localhost:5000/api/users/${realId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      console.log('Delete response:', data);
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to delete patient');
+      }
+      // Remove the deleted patient from the list
+      setPatients(patients.filter(p => p._id !== realId));
+      setSuccess('Patient deleted successfully');
+      // Refresh the patients list
+      const refreshResponse = await fetch('http://localhost:5000/api/users/patients', {
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+      const refreshData = await refreshResponse.json();
+      if (refreshResponse.ok) {
+        const normalizedPatients = (refreshData.data || []).map(p => ({
+          ...p,
+          _id: p._id || p.id
+        }));
+        setPatients(normalizedPatients);
+      }
+    } catch (err) {
+      console.error('Error deleting patient:', err);
+      setError(err.message || 'Failed to delete patient. Please try again.');
+    }
+  };
+
+  if (authLoading || loading || !user?.token) return (
+    <DashboardLayout menuItems={menuItems} title="Physician Portal">
+      <div>Loading...</div>
+    </DashboardLayout>
+  );
 
   return (
     <DashboardLayout menuItems={menuItems} title="Physician Portal">
       <Typography variant="h4" className="dashboard-title" gutterBottom>
         View Patients
       </Typography>
-
+      {error ? (
+        <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>
+      ) : null}
+      {success ? (
+        <div style={{ color: 'green', marginBottom: '1rem' }}>{success}</div>
+      ) : null}
       <Card>
         <CardContent>
           <TableContainer component={Paper}>
@@ -166,37 +241,54 @@ const ViewPatients = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {patients.map((patient) => (
-                  <TableRow key={patient.id}>
-                    <TableCell>{patient.id}</TableCell>
-                    <TableCell>{patient.name}</TableCell>
-                    <TableCell>{patient.age}</TableCell>
-                    <TableCell>{patient.condition}</TableCell>
-                    <TableCell>{patient.lastVisit}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={patient.status} 
-                        color={patient.status === 'Active' ? 'success' : 'default'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        startIcon={<Visibility />}
-                        onClick={() => handleViewDetails(patient)}
-                        sx={{ mr: 1 }}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        startIcon={<Edit />}
-                        onClick={() => handleUpdatePatient(patient.id)}
-                      >
-                        Update
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {patients.map((patient) => {
+                  console.log('Rendering patient:', patient);
+                  return (
+                    <TableRow key={patient._id}>
+                      <TableCell>{patient.patientId}</TableCell>
+                      <TableCell>{patient.fullName}</TableCell>
+                      <TableCell>{patient.age}</TableCell>
+                      <TableCell>{patient.condition}</TableCell>
+                      <TableCell>{patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString() : ''}</TableCell>
+                      <TableCell>
+                        <Chip 
+                          label={patient.status} 
+                          color={patient.status === 'Active' ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          startIcon={<Visibility />}
+                          onClick={() => handleViewDetails(patient)}
+                          sx={{ mr: 1 }}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          startIcon={<Edit />}
+                          onClick={() => handleUpdatePatient(patient)}
+                          sx={{ mr: 1 }}
+                        >
+                          Update
+                        </Button>
+                        <Button
+                          color="error"
+                          onClick={() => {
+                            console.log('Delete clicked for patient:', patient);
+                            if (patient._id) {
+                              handleDeletePatient(patient._id);
+                            } else {
+                              setError('Invalid patient ID');
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -218,7 +310,7 @@ const ViewPatients = () => {
                   <LocalHospital color="primary" />
                 </Grid>
                 <Grid item>
-                  Patient Details - {selectedPatient.name}
+                  Patient Details - {selectedPatient.fullName}
                 </Grid>
               </Grid>
             </DialogTitle>
@@ -229,7 +321,7 @@ const ViewPatients = () => {
                     <ListItem>
                       <ListItemText 
                         primary="Patient ID" 
-                        secondary={selectedPatient.id} 
+                        secondary={selectedPatient.patientId} 
                       />
                     </ListItem>
                     <Divider />
@@ -261,7 +353,7 @@ const ViewPatients = () => {
                   </Typography>
                   <List>
                     {selectedPatient.medicalHistory.map((item, index) => (
-                      <ListItem key={index}>
+                      <ListItem key={`medical-history-${index}`}>
                         <ListItemText primary={item} />
                       </ListItem>
                     ))}
@@ -271,7 +363,7 @@ const ViewPatients = () => {
                   </Typography>
                   <List>
                     {selectedPatient.currentMedications.map((med, index) => (
-                      <ListItem key={index}>
+                      <ListItem key={`medication-${index}`}>
                         <ListItemText primary={med} />
                       </ListItem>
                     ))}
@@ -282,9 +374,9 @@ const ViewPatients = () => {
             <DialogActions>
               <Button onClick={handleCloseDialog}>Close</Button>
               <Button 
-                onClick={() => handleUpdatePatient(selectedPatient.id)}
                 startIcon={<Edit />}
                 variant="contained"
+                onClick={() => handleUpdatePatient(selectedPatient)}
               >
                 Update Patient
               </Button>
