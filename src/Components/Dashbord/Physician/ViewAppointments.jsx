@@ -46,14 +46,21 @@ const ViewAppointments = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [notes, setNotes] = useState('');
   const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const appointmentData = getAppointmentsByPhysicianId('DR001');
-    const appointmentsWithPatientDetails = appointmentData.map(apt => ({
-      ...apt,
-      patient: getPatientById(apt.patientId)
-    }));
-    setAppointments(appointmentsWithPatientDetails);
+    const fetchAppointments = async () => {
+      setLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const response = await fetch('http://localhost:5000/api/appointments/physician', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setAppointments(data.data);
+      setLoading(false);
+    };
+    fetchAppointments();
   }, []);
 
   const menuItems = [
@@ -139,52 +146,32 @@ const ViewAppointments = () => {
       <Typography variant="h4" className="dashboard-title" gutterBottom>
         View Appointments
       </Typography>
-
-      <Card>
-        <CardContent>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Time</TableCell>
-                  <TableCell>Patient Name</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {appointments.map((appointment) => (
-                  <TableRow key={appointment.id}>
-                    <TableCell>{appointment.date}</TableCell>
-                    <TableCell>{appointment.time}</TableCell>
-                    <TableCell>
-                      {`${appointment.patient.firstName} ${appointment.patient.lastName}`}
-                    </TableCell>
-                    <TableCell>{appointment.type}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={appointment.status} 
-                        color={getStatusColor(appointment.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        startIcon={<Visibility />}
-                        onClick={() => handleViewDetails(appointment)}
-                      >
-                        View Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
+        <Grid container spacing={3}>
+          {appointments.map((appt) => (
+            <Grid item xs={12} key={appt._id}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6">
+                    {appt.department} Appointment
+                  </Typography>
+                  <Typography variant="body1">
+                    Patient: {appt.patientId?.fullName} ({appt.patientId?.patientId})
+                  </Typography>
+                  <Typography variant="body2">
+                    Date: {new Date(appt.date).toLocaleDateString()}<br />
+                    Time: {appt.time}<br />
+                    Reason: {appt.reason}<br />
+                    Status: {appt.status}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       {/* Appointment Details Dialog */}
       <Dialog

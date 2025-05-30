@@ -3,64 +3,61 @@ import express from 'express';
 import Appointment from '../models/appointment.model.js';
 import User from '../models/user.model.js';
 import { validateTimeSlot, isWithinBusinessHours } from '../utils/timeUtils.js';
+import mongoose from 'mongoose';
 
 /**
  * Create a new appointment
  */
 export const createAppointment = async (req, res) => {
   try {
-    const { patientId, physicianId, appointmentDate, timeSlot, reason } = req.body;
+    console.log('[createAppointment] Start');
+    const { department, physicianUsername, date, time, reason } = req.body;
+    console.log('[createAppointment] Request Body:', req.body);
 
-    // Validate time slot format
-    if (!validateTimeSlot(timeSlot)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid time slot format. Please use HH:MM format (e.g., 09:00)'
-      });
+    // Get patientId from logged-in user
+    const patientId = req.user._id;
+    console.log('[createAppointment] Patient ID from token:', patientId);
+
+    // Find physician by username
+    const physician = await User.findOne({ username: physicianUsername, role: 'physician' });
+    console.log('[createAppointment] Found Physician:', physician ? physician._id : 'Not Found');
+
+    if (!physician) {
+      console.log('[createAppointment] Physician not found');
+      return res.status(404).json({ success: false, message: 'Physician not found' });
     }
+    
+    // Convert date string to Date object
+    const appointmentDate = new Date(date);
+    console.log('[createAppointment] Parsed Date:', appointmentDate);
 
-    // Check if time slot is within business hours
-    if (!isWithinBusinessHours(timeSlot)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Appointments are only available during business hours (9:00 AM - 5:00 PM)'
-      });
-    }
-
-    // Check if the time slot is available
-    const existingAppointment = await Appointment.findOne({
-      physicianId,
-      appointmentDate,
-      timeSlot,
-      status: { $ne: 'cancelled' }
-    });
-
-    if (existingAppointment) {
-      return res.status(400).json({
-        success: false,
-        message: 'This time slot is already booked'
-      });
-    }
+    // Add logging for server current date
+    const serverToday = new Date();
+    serverToday.setHours(0, 0, 0, 0);
+    console.log('[createAppointment] Server Today (start of day):', serverToday);
 
     const appointment = new Appointment({
       patientId,
-      physicianId,
-      appointmentDate,
-      timeSlot,
-      reason
+      physicianId: physician._id,
+      department,
+      date: appointmentDate, // Use Date object
+      time,
+      reason,
+      status: 'scheduled'
     });
+    console.log('[createAppointment] Created Appointment Object:', appointment);
 
-    await appointment.save();
+    const saved = await appointment.save();
+    console.log('[createAppointment] Appointment Saved:', saved);
 
-    res.status(201).json({
-      success: true,
-      data: appointment
-    });
+    res.status(201).json({ success: true, message: 'Appointment scheduled', data: saved });
+    console.log('[createAppointment] Success Response Sent');
+
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    console.error('[createAppointment] Error:', error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, message: 'Error scheduling appointment', error: errMsg });
+    console.log('[createAppointment] Error Response Sent');
   }
 };
 
@@ -330,5 +327,34 @@ export const getAvailableTimeSlots = async (req, res) => {
       message: 'Error fetching available time slots',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+};
+
+/**
+ * Get physician appointments
+ */
+export const getPhysicianAppointments = async (req, res) => {
+  try {
+    const physicianId = req.user._id;
+    const appointments = await Appointment.find({ physicianId })
+      .populate('patientId', 'fullName patientId email')
+      .sort({ date: 1, time: 1 });
+    res.json({ success: true, data: appointments });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, message: 'Error fetching appointments', error: errMsg });
+  }
+};
+
+/**
+ * Get all physicians
+ */
+export const getAllPhysicians = async (req, res) => {
+  try {
+    const physicians = await User.find({ role: 'physician' }).select('username fullName');
+    res.json({ success: true, data: physicians });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    res.status(500).json({ success: false, message: 'Error fetching physicians', error: errMsg });
   }
 }; 

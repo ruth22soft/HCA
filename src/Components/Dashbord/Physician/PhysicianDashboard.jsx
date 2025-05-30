@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Card, 
@@ -21,6 +21,27 @@ import './PhysicianD.css';
 
 const PhysicianDashboard = () => {
   const navigate = useNavigate();
+
+  const [stats, setStats] = useState({
+    totalPatients: 0,
+    todaysAppointments: 0,
+    pendingReports: 0,
+    pendingRecommendations: 0,
+    recentActivity: []
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const response = await fetch('http://localhost:5000/api/physician-dashboard/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setStats(data.data);
+    };
+    fetchStats();
+  }, []);
 
   const menuItems = [
     { 
@@ -67,21 +88,13 @@ const PhysicianDashboard = () => {
     }
   ];
 
-  // Example statistics
-  const stats = {
-    totalPatients: 45,
-    todayAppointments: 8,
-    pendingReports: 3,
-    pendingRecommendations: 5
-  };
-
   return (
-    <DashboardLayout menuItems={menuItems} title="Physician Portal">
+    <DashboardLayout menuItems={menuItems} title="Physician Dashboard">
       <Typography variant="h4" className="dashboard-title" gutterBottom>
         Physician Dashboard
       </Typography>
 
-      <Grid container spacing={4}>
+      <Grid container spacing={3}>
         {/* Statistics Cards */}
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ bgcolor: '#e3f2fd' }}>
@@ -103,14 +116,14 @@ const PhysicianDashboard = () => {
                 Today's Appointments
               </Typography>
               <Typography variant="h4">
-                {stats.todayAppointments}
+                {stats.todaysAppointments}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ bgcolor: '#fff3e0' }}>
+          <Card sx={{ bgcolor: '#fffde7' }}>
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 Pending Reports
@@ -143,21 +156,21 @@ const PhysicianDashboard = () => {
                 Recent Activity
               </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="body1" color="text.secondary">
-                    • Completed appointment with Patient #123 - 30 minutes ago
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body1" color="text.secondary">
-                    • Generated report for Patient #456 - 2 hours ago
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body1" color="text.secondary">
-                    • Approved recommendation for Patient #789 - 3 hours ago
-                  </Typography>
-                </Grid>
+                {stats.recentActivity && stats.recentActivity.length > 0 ? (
+                  stats.recentActivity.map((activity, idx) => (
+                    <Grid item xs={12} key={idx}>
+                      <Typography variant="body1" color="text.secondary">
+                        {activity.status === 'approved' ? 'Approved recommendation' : 'Submitted advice'} for Patient #{activity.patientId?.patientId || ''} - {new Date(activity.updatedAt).toLocaleString()}
+                      </Typography>
+                    </Grid>
+                  ))
+                ) : (
+                  <Grid item xs={12}>
+                    <Typography variant="body1" color="text.secondary">
+                      No recent activity.
+                    </Typography>
+                  </Grid>
+                )}
               </Grid>
             </CardContent>
           </Card>

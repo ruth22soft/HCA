@@ -1,52 +1,56 @@
 // @ts-nocheck
-import { Request, Response } from 'express';
+// Remove: import { Request, Response } from 'express';
 import Advice from '../models/advice.model.js';
 import User from '../models/user.model.js';
+import mongoose from 'mongoose';
 
 /**
  * Create a new advice request
  */
 export const createAdvice = async (req, res) => {
   try {
-    const { department, subject, description, urgencyLevel } = req.body;
-    const patientId = req.user._id;
+    let { patientId: bodyPatientId, condition, medications, lifestyle, urgencyLevel } = req.body;
+    let patientId = bodyPatientId;
 
-    // Check if the patient exists and is active
-    const patient = await User.findById(patientId);
-    if (!patient) {
-      return res.status(404).json({
-        success: false,
-        message: 'Patient not found'
-      });
+    // If not a valid ObjectId, resolve by patient code
+    if (!mongoose.Types.ObjectId.isValid(patientId)) {
+      const patient = await User.findOne({ patientId: patientId });
+      if (!patient) {
+        return res.status(404).json({ success: false, message: 'Patient not found' });
+      }
+      patientId = patient._id;
     }
 
+    // Now, patientId is always an ObjectId
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
     if (patient.accountStatus !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Your account is not active. Please contact administrator.'
-      });
+      return res.status(403).json({ success: false, message: 'Patient account is not active. Please contact administrator.' });
     }
 
     const advice = new Advice({
       patientId,
-      department,
-      subject,
-      description,
-      urgencyLevel
+      condition,
+      medications,
+      lifestyle,
+      urgencyLevel,
+      status: 'pending'
     });
 
     const savedAdvice = await advice.save();
 
     res.status(201).json({
       success: true,
-      message: 'Advice request submitted successfully',
+      message: 'Advice submitted successfully',
       data: savedAdvice
     });
   } catch (error) {
     console.error('Error in createAdvice:', error);
     res.status(500).json({
       success: false,
-      message: 'Error submitting advice request',
+      message: 'Error submitting advice',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -66,7 +70,7 @@ export const getAllAdvice = async (req, res) => {
     }
 
     const advice = await Advice.find(query)
-      .populate('patientId', 'fullName email')
+      .populate('patientId', 'patientId fullName email')
       .sort({ urgencyLevel: -1, createdAt: -1 });
 
     res.json({
@@ -89,10 +93,8 @@ export const getAllAdvice = async (req, res) => {
 export const getPatientAdvice = async (req, res) => {
   try {
     const patientId = req.user._id;
-    
-    const advice = await Advice.find({ patientId })
+    const advice = await Advice.find({ patientId, status: 'approved' })
       .sort({ createdAt: -1 });
-
     res.json({
       success: true,
       data: advice
@@ -261,5 +263,33 @@ export const getAdviceByUrgency = async (req, res) => {
       message: 'Error fetching advice requests',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+};
+
+export const approveAdvice = async (req, res) => {
+  try {
+    const advice = await Advice.findById(req.params.id);
+    if (!advice) {
+      return res.status(404).json({ success: false, message: 'Advice not found' });
+    }
+    advice.status = 'approved';
+    await advice.save();
+    res.json({ success: true, message: 'Advice approved', data: advice });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error approving advice', error: error.message });
+  }
+};
+
+export const rejectAdvice = async (req, res) => {
+  try {
+    const advice = await Advice.findById(req.params.id);
+    if (!advice) {
+      return res.status(404).json({ success: false, message: 'Advice not found' });
+    }
+    advice.status = 'rejected';
+    await advice.save();
+    res.json({ success: true, message: 'Advice rejected', data: advice });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error rejecting advice', error: error.message });
   }
 }; 

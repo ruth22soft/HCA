@@ -7,7 +7,9 @@ import {
   getAppointmentById,
   updateAppointmentStatus,
   cancelAppointment,
-  getAvailableTimeSlots
+  getAvailableTimeSlots,
+  getPhysicianAppointments,
+  getAllPhysicians
 } from '../controllers/appointment.controller.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
@@ -21,6 +23,14 @@ router.get('/patient', getPatientAppointments);
 router.post('/', authorize('patient'), createAppointment);
 router.get('/available-slots', getAvailableTimeSlots);
 
+
+// Schedule appointment (patient)
+router.post('/', authorize('patient'), createAppointment);
+// Get all physicians (for dropdown)
+router.get('/physicians', authorize(['patient', 'physician', 'admin']), getAllPhysicians);
+// Get physician's appointments
+router.get('/physician', authorize(['physician']), getPhysicianAppointments);
+
 // Admin and physician routes
 router.get('/', authorize(['admin', 'physician']), getAllAppointments);
 router.get('/:id', authorize(['admin', 'physician']), getAppointmentById);
@@ -28,5 +38,6 @@ router.put('/:id/status', authorize(['admin', 'physician']), updateAppointmentSt
 
 // Patient and admin can cancel appointments
 router.put('/:id/cancel', authorize(['admin', 'patient']), cancelAppointment);
+
 
 export default router; 

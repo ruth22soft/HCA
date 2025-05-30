@@ -8,6 +8,9 @@ import mongoose from 'mongoose';
  * @property {('Low'|'Normal'|'High'| 'Urgent')} urgencyLevel 
  * @property {Date} createdAt
  * @property {Date} updatedAt
+ * @property {string} condition - Medical condition
+ * @property {string} medications - Medications
+ * @property {string} lifestyle - Lifestyle
  */
 
 const adviceSchema = new mongoose.Schema({
@@ -16,25 +19,20 @@ const adviceSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Patient ID is required']
   },
-  department: {
+  condition: {
     type: String,
-    required: [true, 'Department is required'],
-    enum: {
-      values: ['General Medicine', 'Blood Test', 'Diabetis Test', 'Cancer Test'],
-      message: 'Invalid department selected'
-    }
+    required: [true, 'Medical condition is required'],
+    trim: true
   },
-  subject: {
+  medications: {
     type: String,
-    required: [true, 'Subject is required'],
-    trim: true,
-    minlength: [3, 'Subject must be at least 3 characters long']
+    required: [true, 'Medications are required'],
+    trim: true
   },
-  description: {
+  lifestyle: {
     type: String,
-    required: [true, 'Description is required'],
     trim: true,
-    minlength: [10, 'Description must be at least 10 characters long']
+    default: ''
   },
   urgencyLevel: {
     type: String,
@@ -44,6 +42,12 @@ const adviceSchema = new mongoose.Schema({
       message: 'Invalid urgency level'
     },
     default: 'Normal'
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
+    required: true
   }
 }, {
   timestamps: true

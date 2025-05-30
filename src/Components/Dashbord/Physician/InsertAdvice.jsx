@@ -87,10 +87,42 @@ const InsertAdvice = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Advice submitted:', formData);
-    // Add API call here
+    try {
+      const payload = {
+        patientId: formData.patientId,
+        condition: formData.condition,
+        medications: formData.medications,
+        lifestyle: formData.lifestyle,
+        urgencyLevel: formData.urgency.charAt(0).toUpperCase() + formData.urgency.slice(1)
+      };
+      // Get token from user object in localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const response = await fetch('http://localhost:5000/api/advice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to submit advice');
+      }
+      alert('Advice submitted successfully!');
+      setFormData({
+        patientId: '',
+        condition: '',
+        medications: '',
+        lifestyle: '',
+        urgency: 'normal'
+      });
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (

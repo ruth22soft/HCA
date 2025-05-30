@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -25,12 +25,26 @@ import DashboardLayout from '../DasboardLayout';
 const AddAppointment = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    doctor: '',
     department: '',
+    physicianUsername: '',
     date: '',
     time: '',
     reason: ''
   });
+  const [physicians, setPhysicians] = useState([]);
+
+  useEffect(() => {
+    const fetchPhysicians = async () => {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const response = await fetch('http://localhost:5000/api/appointments/physicians', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setPhysicians(data.data);
+    };
+    fetchPhysicians();
+  }, []);
 
   const menuItems = [
     { 
@@ -66,16 +80,30 @@ const AddAppointment = () => {
   ];
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Appointment form submitted:', formData);
-    // Add API call here
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const payload = { ...formData };
+      const response = await fetch('http://localhost:5000/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to schedule appointment');
+      alert('Appointment scheduled successfully!');
+      setFormData({ department: '', physicianUsername: '', date: '', time: '', reason: '' });
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -97,28 +125,28 @@ const AddAppointment = () => {
                     onChange={handleChange}
                     required
                   >
-                    <MenuItem value="general">General Medicine</MenuItem>
-                    <MenuItem value="cardiology">Blood Test</MenuItem>
-                    <MenuItem value="orthopedics">Deabetis Test</MenuItem>
-                    <MenuItem value="pediatrics">Cancer Test</MenuItem>
-                    <MenuItem value="neurology"></MenuItem>
+                    <MenuItem value="General Medicine">General Medicine</MenuItem>
+                    <MenuItem value="Blood Test">Blood Test</MenuItem>
+                    <MenuItem value="Diabetis Test">Diabetis Test</MenuItem>
+                    <MenuItem value="Cancer Test">Cancer Test</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
+                <FormControl fullWidth required>
                   <InputLabel>Doctor</InputLabel>
                   <Select
-                    name="doctor"
-                    value={formData.doctor}
+                    name="physicianUsername"
+                    value={formData.physicianUsername}
                     onChange={handleChange}
                     required
                   >
-                    <MenuItem value="dr-smith">Dr. Abebe</MenuItem>
-                    <MenuItem value="dr-johnson">Dr. Liya</MenuItem>
-                    <MenuItem value="dr-williams">Dr. Bahru</MenuItem>
-                    <MenuItem value="dr-brown">Dr. Afwork</MenuItem>
+                    {physicians.map((doc) => (
+                      <MenuItem key={doc.username} value={doc.username}>
+                        {doc.fullName || doc.username}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

@@ -15,6 +15,9 @@ import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import appointmentRoutes from './routes/appointment.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import adviceRoutes from './routes/advice.routes.js';
+import patientReportRoutes from './routes/patientreport.routes.js';
+import physicianDashboardRoutes from './routes/physicianDashboard.routes.js';
 // import certificateRoutes from './routes/certificate.routes.js';
 // import reportRoutes from './routes/report.routes.js';
 
@@ -52,6 +55,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/advice', adviceRoutes);
+app.use('/api/patient-reports', patientReportRoutes);
+app.use('/api/physician-dashboard', physicianDashboardRoutes);
 // app.use('/api/certificates', certificateRoutes);
 // app.use('/api/reports', reportRoutes);
 

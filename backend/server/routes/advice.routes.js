@@ -7,14 +7,16 @@ import {
   getAdviceById,
   updateAdvice,
   deleteAdvice,
-  getAdviceByUrgency
+  getAdviceByUrgency,
+  approveAdvice,
+  rejectAdvice
 } from '../controllers/advice.controller.js';
-import { auth } from '../middleware/auth.js';
+import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All routes are protected by authentication
-router.use(auth);
+router.use(authenticate);
 
 // Create a new advice request (patients only)
 router.post('/', createAdvice);
@@ -36,5 +38,11 @@ router.put('/:id', updateAdvice);
 
 // Delete an advice request
 router.delete('/:id', deleteAdvice);
+
+// Approve an advice
+router.put('/:id/approve', approveAdvice);
+
+// Reject an advice
+router.put('/:id/reject', rejectAdvice);
 
 export default router; 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -28,7 +28,9 @@ import DashboardLayout from '../DasboardLayout';
 
 const ApproveRecommendations = () => {
   const navigate = useNavigate();
-  
+  const [advices, setAdvices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const menuItems = [
     { 
       label: 'Dashboard', 
@@ -74,38 +76,48 @@ const ApproveRecommendations = () => {
     }
   ];
 
-  // Example recommendations data
-  const [recommendations, setRecommendations] = useState([
-    {
-      id: 1,
-      patientId: "P123",
-      patientName: "Belay",
-      type: "Medication",
-      description: "Prescribe antibiotics for infection",
-      status: "pending",
-      date: "2024-12-20"
-    },
-    {
-      id: 2,
-      patientId: "P124",
-      patientName: "Yohans",
-      type: "Treatment",
-      description: "Physical therapy sessions",
-      status: "pending",
-      date: "2024-12-21"
-    }
-  ]);
+  useEffect(() => {
+    const fetchAdvices = async () => {
+      setLoading(true);
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const token = user?.token;
+        const response = await fetch('http://localhost:5000/api/advice', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setAdvices(data.data || []);
+        } else {
+          setAdvices([]);
+        }
+      } catch (err) {
+        setAdvices([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAdvices();
+  }, []);
 
-  const handleApprove = (id) => {
-    setRecommendations(recommendations.map(rec => 
-      rec.id === id ? {...rec, status: 'approved'} : rec
-    ));
+  const handleApprove = async (id) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = user?.token;
+    await fetch(`http://localhost:5000/api/advice/${id}/approve`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    setAdvices(advices.map(a => a._id === id ? { ...a, status: 'approved' } : a));
   };
 
-  const handleReject = (id) => {
-    setRecommendations(recommendations.map(rec => 
-      rec.id === id ? {...rec, status: 'rejected'} : rec
-    ));
+  const handleReject = async (id) => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    const token = user?.token;
+    await fetch(`http://localhost:5000/api/advice/${id}/reject`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    setAdvices(advices.map(a => a._id === id ? { ...a, status: 'rejected' } : a));
   };
 
   return (
@@ -113,86 +125,89 @@ const ApproveRecommendations = () => {
       <Typography variant="h4" className="dashboard-title" gutterBottom>
         Approve Recommendations
       </Typography>
-
-      <Grid container spacing={3}>
-        {recommendations.map((rec) => (
-          <Grid item xs={12} key={rec.id}>
-            <Card>
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={8}>
-                    <Typography variant="h6" gutterBottom>
-                      {rec.type}
-                      <Chip
-                        label={rec.status}
-                        color={
-                          rec.status === 'approved' ? 'success' : 
-                          rec.status === 'rejected' ? 'error' : 
-                          'default'
-                        }
-                        size="small"
-                        sx={{ ml: 2 }}
-                      />
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12} sm={4} sx={{ textAlign: 'right' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Date: {rec.date}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Divider />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <List>
-                      <ListItem>
-                        <ListItemText
-                          primary="Patient ID"
-                          secondary={rec.patientId}
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
+        <Grid container spacing={3}>
+          {advices.map((advice) => (
+            <Grid item xs={12} key={advice._id}>
+              <Card>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={8}>
+                      <Typography variant="h6" gutterBottom>
+                        {advice.condition}
+                        <Chip
+                          label={advice.status}
+                          color={
+                            advice.status === 'approved' ? 'success' : 
+                            advice.status === 'rejected' ? 'error' : 
+                            'default'
+                          }
+                          size="small"
+                          sx={{ ml: 2 }}
                         />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemText
-                          primary="Patient Name"
-                          secondary={rec.patientName}
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemText
-                          primary="Description"
-                          secondary={rec.description}
-                        />
-                      </ListItem>
-                    </List>
-                  </Grid>
-                  {rec.status === 'pending' && (
-                    <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          startIcon={<ThumbUp />}
-                          onClick={() => handleApprove(rec.id)}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          variant="contained"
-                          color="error"
-                          startIcon={<ThumbDown />}
-                          onClick={() => handleReject(rec.id)}
-                        >
-                          Reject
-                        </Button>
-                      </Box>
+                      </Typography>
                     </Grid>
-                  )}
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                    <Grid item xs={12} sm={4} sx={{ textAlign: 'right' }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Date: {advice.createdAt ? advice.createdAt.substring(0, 10) : ''}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Divider />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <List>
+                        <ListItem>
+                          <ListItemText
+                            primary="Patient ID"
+                            secondary={advice.patientId && advice.patientId.patientId ? advice.patientId.patientId : ''}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText
+                            primary="Patient Name"
+                            secondary={advice.patientId && advice.patientId.fullName ? advice.patientId.fullName : ''}
+                          />
+                        </ListItem>
+                        <ListItem>
+                          <ListItemText
+                            primary="Medications"
+                            secondary={advice.medications}
+                          />
+                        </ListItem>
+                      </List>
+                    </Grid>
+                    {advice.status === 'pending' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<ThumbUp />}
+                            onClick={() => handleApprove(advice._id)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="error"
+                            startIcon={<ThumbDown />}
+                            onClick={() => handleReject(advice._id)}
+                          >
+                            Reject
+                          </Button>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </DashboardLayout>
   );
 };

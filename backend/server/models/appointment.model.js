@@ -2,10 +2,10 @@ import mongoose from 'mongoose';
 /**
  * @typedef {Object} IAppointment
  * @property {mongoose.Types.ObjectId} patientId - Reference to the patient making the appointment
+ * @property {mongoose.Types.ObjectId} physicianId - Reference to the physician making the appointment
  * @property {('General Medicine'|'Blood Test'|'Diabetis Test'|'Cancer Test')} department
- * @property {('Dr. Abebe'|'Dr. Liya'|'Dr. Bahru'| 'Dr. Afework')} doctor
- * @property {Date} appointmentDate - Date of the appointment
- * @property {string} appointmentTime - Time slot of the appointment (e.g., "09:00", "14:30")
+ * @property {Date} date - Date of the appointment
+ * @property {string} time - Time slot of the appointment (e.g., "09:00", "14:30")
  * @property {string} reason - Reason for the appointment
  * @property {('scheduled'|'completed'|'cancelled'|'no-show')} status - Status of the appointment
  * @property {Date} createdAt
@@ -18,6 +18,11 @@ const appointmentSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'Patient ID is required']
   },
+  physicianId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'Physician ID is required']
+  },
   department: {
     type: String,
     required: [true, 'Department is required'],
@@ -26,15 +31,7 @@ const appointmentSchema = new mongoose.Schema({
       message: 'Invalid department selected'
     }
   },
-  doctor: {
-    type: String,
-    required: [true, 'Doctor is required'],
-    enum: {
-      values: ['Dr. Abebe', 'Dr. Liya', 'Dr. Bahru', 'Dr. Afework'],
-      message: 'Invalid doctor selected'
-    }
-  },
-  appointmentDate: {
+  date: {
     type: Date,
     required: [true, 'Appointment date is required'],
     validate: {
@@ -51,7 +48,7 @@ const appointmentSchema = new mongoose.Schema({
       message: 'Appointment date cannot be in the past'
     }
   },
-  appointmentTime: {
+  time: {
     type: String,
     required: [true, 'Appointment time is required'],
     validate: {
@@ -94,8 +91,8 @@ const appointmentSchema = new mongoose.Schema({
 });
 
 // Index for efficient querying
-appointmentSchema.index({ patientId: 1, appointmentDate: 1 });
-appointmentSchema.index({ doctor: 1, appointmentDate: 1, appointmentTime: 1 }, { unique: true });
+appointmentSchema.index({ patientId: 1, date: 1 });
+appointmentSchema.index({ physicianId: 1, date: 1, time: 1 }, { unique: true });
 
 /** @type {import('mongoose').Model<import('./appointment.model').IAppointment>} */
 const Appointment = mongoose.model('Appointment', appointmentSchema);

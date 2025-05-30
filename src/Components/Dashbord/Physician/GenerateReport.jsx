@@ -87,10 +87,43 @@ const GenerateReport = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Report generated:', formData);
-    // Add API call here
+    try {
+      const payload = {
+        patientId: formData.patientId,
+        diagnosis: formData.diagnosis,
+        treatment: formData.treatment,
+        prescription: formData.prescription,
+        followUpDate: formData.followUpDate,
+        notes: formData.notes
+      };
+      const user = JSON.parse(localStorage.getItem('user'));
+      const token = user?.token;
+      const response = await fetch('http://localhost:5000/api/patient-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to generate report');
+      }
+      alert('Report generated successfully!');
+      setFormData({
+        patientId: '',
+        diagnosis: '',
+        treatment: '',
+        prescription: '',
+        followUpDate: '',
+        notes: ''
+      });
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
