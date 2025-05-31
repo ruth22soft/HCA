@@ -85,6 +85,13 @@ const AddAppointment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Add client-side validation for reason length
+    if (formData.reason.length < 10) {
+      alert('Reason for visit must be at least 10 characters long.');
+      return;
+    }
+
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       const token = user?.token;

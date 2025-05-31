@@ -18,6 +18,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import adviceRoutes from './routes/advice.routes.js';
 import patientReportRoutes from './routes/patientreport.routes.js';
 import physicianDashboardRoutes from './routes/physicianDashboard.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 // import certificateRoutes from './routes/certificate.routes.js';
 // import reportRoutes from './routes/report.routes.js';
 
@@ -58,6 +59,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/advice', adviceRoutes);
 app.use('/api/patient-reports', patientReportRoutes);
 app.use('/api/physician-dashboard', physicianDashboardRoutes);
+app.use('/api/notifications', notificationRoutes);
 // app.use('/api/certificates', certificateRoutes);
 // app.use('/api/reports', reportRoutes);
 
@@ -125,9 +127,6 @@ app.use((req, res) => {
   });
 });
 
-// Start the server
-connectDB().catch(console.error);
-
 // Error handling middleware
 /** @type {express.ErrorRequestHandler} */
 const errorHandler = (err, req, res, next) => {
@@ -140,3 +139,6 @@ const errorHandler = (err, req, res, next) => {
 };
 
 app.use(errorHandler);
+
+// Start the server
+connectDB().catch(console.error);

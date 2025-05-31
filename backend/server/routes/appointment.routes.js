@@ -20,7 +20,10 @@ router.use(authenticate);
 
 // Patient routes
 router.get('/patient', getPatientAppointments);
-router.post('/', authorize('patient'), createAppointment);
+router.post('/', authorize('patient'), (req, res, next) => {
+  console.log('[Appointment Route] POST /api/appointments hit.');
+  next();
+}, createAppointment);
 router.get('/available-slots', getAvailableTimeSlots);
 
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import {
   Card,
   CardContent,
@@ -11,28 +12,25 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Rating,
-  Box,
 } from '@mui/material';
 import {
   Dashboard,
   EventNote,
   Comment,
-  Feedback as FeedbackIcon,
+  Feedback,
   Assignment,
-  MedicalServices,
-  Star
+  MedicalServices
 } from '@mui/icons-material';
 import DashboardLayout from '../DasboardLayout';
 
-const Feedback = () => {
+const FeedbackForm = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     serviceType: '',
-    rating: 0,
-    comment: '',
     doctorName: '',
-    visitDate: ''
+    visitDate: '',
+    rating: '',
+    comments: ''
   });
 
   const menuItems = [
@@ -63,36 +61,77 @@ const Feedback = () => {
     { 
       label: 'Give Feedback', 
       path: '/dashboard/patient/feedback', 
-      icon: <FeedbackIcon />,
+      icon: <Feedback />,
       onClick: () => navigate('/dashboard/patient/feedback')
     }
   ];
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
   };
 
-  const handleRatingChange = (event, newValue) => {
-    setFormData({
-      ...formData,
-      rating: newValue
-    });
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Feedback submitted:', formData);
-    // You can add API call here
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.token) {
+        toast.error('Please login to submit feedback');
+        navigate('/login');
+        return;
+      }
+
+      // Create notification for feedback
+      const response = await fetch('http://localhost:5000/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          type: 'feedback',
+          title: 'New Patient Feedback',
+          message: `Patient ${user.name} has submitted feedback`,
+          targetRole: 'admin',
+          metadata: {
+            patientId: user._id,
+            patientName: user.name,
+            serviceType: formData.serviceType,
+            doctorName: formData.doctorName,
+            visitDate: formData.visitDate,
+            rating: formData.rating,
+            comments: formData.comments
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit feedback');
+      }
+
+      toast.success('Feedback submitted successfully!');
+      setFormData({
+        serviceType: '',
+        doctorName: '',
+        visitDate: '',
+        rating: '',
+        comments: ''
+      });
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast.error(error.message || 'Failed to submit feedback. Please try again.');
+    }
   };
 
   return (
     <DashboardLayout menuItems={menuItems} title="Patient Portal">
       <Typography variant="h4" className="dashboard-title" gutterBottom>
-        Provide Your Feedback
+        Give Feedback
       </Typography>
 
       <Card sx={{ maxWidth: 800, mx: 'auto', mt: 4 }}>
@@ -109,10 +148,9 @@ const Feedback = () => {
                     required
                   >
                     <MenuItem value="consultation">Consultation</MenuItem>
-                    <MenuItem value="treatment">Treatment</MenuItem>
-                    <MenuItem value="emergency">Emergency Service</MenuItem>
-                    <MenuItem value="followup">Follow-up Visit</MenuItem>
-                    <MenuItem value="general">General Service</MenuItem>
+                    <MenuItem value="emergency">Emergency</MenuItem>
+                    <MenuItem value="surgery">Surgery</MenuItem>
+                    <MenuItem value="other">Other</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
@@ -120,7 +158,7 @@ const Feedback = () => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Doctor's Name"
+                  label="Doctor Name"
                   name="doctorName"
                   value={formData.doctorName}
                   onChange={handleChange}
@@ -136,36 +174,42 @@ const Feedback = () => {
                   type="date"
                   value={formData.visitDate}
                   onChange={handleChange}
+                  required
                   InputLabelProps={{
                     shrink: true,
                   }}
-                  required
                 />
               </Grid>
 
               <Grid item xs={12}>
-                <Typography component="legend">Rate Your Experience</Typography>
-                <Rating
-                  name="rating"
-                  value={formData.rating}
-                  onChange={handleRatingChange}
-                  icon={<Star fontSize="inherit" />}
-                  size="large"
-                  sx={{ mt: 1 }}
-                />
+                <FormControl fullWidth>
+                  <InputLabel>Rating</InputLabel>
+                  <Select
+                    name="rating"
+                    value={formData.rating}
+                    onChange={handleChange}
+                    required
+                  >
+                    <MenuItem value="1">1 - Poor</MenuItem>
+                    <MenuItem value="2">2 - Fair</MenuItem>
+                    <MenuItem value="3">3 - Good</MenuItem>
+                    <MenuItem value="4">4 - Very Good</MenuItem>
+                    <MenuItem value="5">5 - Excellent</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
 
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Your Comments"
-                  name="comment"
-                  value={formData.comment}
+                  label="Comments"
+                  name="comments"
+                  value={formData.comments}
                   onChange={handleChange}
                   multiline
                   rows={4}
                   required
-                  placeholder="Please share your experience and suggestions for improvement..."
+                  placeholder="Please share your experience..."
                 />
               </Grid>
 
@@ -176,7 +220,6 @@ const Feedback = () => {
                   color="primary"
                   size="large"
                   fullWidth
-                  startIcon={<FeedbackIcon />}
                 >
                   Submit Feedback
                 </Button>
@@ -189,4 +232,4 @@ const Feedback = () => {
   );
 };
 
-export default Feedback; 
+export default FeedbackForm; 

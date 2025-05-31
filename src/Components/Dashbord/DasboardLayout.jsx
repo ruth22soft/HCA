@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -18,6 +18,7 @@ import {
   ListItemAvatar,
   MenuItem,
   Button,
+  CircularProgress
 } from '@mui/material';
 import {
   AccountCircle,
@@ -26,6 +27,8 @@ import {
   Person as PersonIcon,
   Event as EventIcon,
   Assignment as AssignmentIcon,
+  MedicalServices as MedicalServicesIcon,
+  Feedback as FeedbackIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../Auth/AuthContext';
@@ -40,37 +43,50 @@ const DashboardLayout = ({ children, menuItems, title }) => {
   const { logout, user } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [notificationError, setNotificationError] = useState(null);
 
-  // Example notifications
-  const notifications = [
-    {
-      id: 1,
-      type: 'user',
-      title: 'New User Registration',
-      message: 'John Doe has registered as a new patient',
-      time: '5 mins ago',
-      icon: <PersonIcon />
-    },
-    {
-      id: 2,
-      type: 'appointment',
-      title: 'Appointment Request',
-      message: 'New appointment request from Sarah Smith',
-      time: '10 mins ago',
-      icon: <EventIcon />
-    },
-    {
-      id: 3,
-      type: 'system',
-      title: 'System Update',
-      message: 'System maintenance scheduled for tonight',
-      time: '1 hour ago',
-      icon: <AssignmentIcon />
+  const fetchNotifications = async () => {
+    if (!user || !user.token) {
+      console.error('User not authenticated.');
+      setNotificationError('Please login to view notifications.');
+      return;
     }
-  ];
+
+    setLoadingNotifications(true);
+    setNotificationError(null);
+    try {
+      const response = await fetch('http://localhost:5000/api/notifications', {
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch notifications');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        const sortedNotifications = data.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setNotifications(sortedNotifications);
+      } else {
+        setNotificationError(data.error || 'Failed to fetch notifications.');
+      }
+
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      setNotificationError(error.message || 'Failed to fetch notifications.');
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
 
   const handleNotificationClick = (event) => {
     setAnchorEl(event.currentTarget);
+    fetchNotifications();
   };
 
   const handleNotificationClose = () => {
@@ -89,10 +105,8 @@ const DashboardLayout = ({ children, menuItems, title }) => {
     handleUserMenuClose();
     logout();
 
-    // Get the current path
     const currentPath = window.location.pathname;
 
-    // Direct navigation based on current dashboard
     if (currentPath.includes('/dashboard/admin')) {
       window.location.href = '/login?user=admin';
     } 
@@ -110,13 +124,122 @@ const DashboardLayout = ({ children, menuItems, title }) => {
     }
   };
 
+  const renderNotificationContent = (notification) => {
+    switch (notification.type) {
+      case 'advice_request':
+        return (
+          <React.Fragment>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              Patient ID: {notification.metadata?.patientId}
+            </Typography>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              Description: {notification.metadata?.description}
+            </Typography>
+            <Typography
+              component="span"
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block' }}
+            >
+              Urgency: {notification.metadata?.urgency}
+            </Typography>
+            <Typography
+              component="span"
+              variant="caption"
+              color="text.secondary"
+            >
+              {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : notification.time}
+            </Typography>
+          </React.Fragment>
+        );
+      case 'feedback':
+        return (
+          <React.Fragment>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              Patient ID: {notification.metadata?.patientId}
+            </Typography>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              Doctor: {notification.metadata?.doctorName}
+            </Typography>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              Comment: {notification.metadata?.comments}
+            </Typography>
+            <Typography
+              component="span"
+              variant="caption"
+              color="text.secondary"
+            >
+              {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : notification.time}
+            </Typography>
+          </React.Fragment>
+        );
+      default:
+        return (
+          <React.Fragment>
+            <Typography
+              component="span"
+              variant="body2"
+              color="text.primary"
+              sx={{ display: 'block' }}
+            >
+              {notification.message || notification.title}
+            </Typography>
+            <Typography
+              component="span"
+              variant="caption"
+              color="text.secondary"
+            >
+              {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : notification.time}
+            </Typography>
+          </React.Fragment>
+        );
+    }
+  };
+
+  const getNotificationIcon = (notification) => {
+    switch (notification.type) {
+      case 'advice_request':
+        return <MedicalServicesIcon />;
+      case 'feedback':
+        return <FeedbackIcon />;
+      case 'system_alert':
+        return <AssignmentIcon />;
+      default:
+        return <NotificationsIcon />;
+    }
+  };
+
   return (
     <Box sx={{ 
       display: 'flex',
       minHeight: '100vh',
-      paddingTop: '80px'  // Fixed padding to ensure content is below navbar
+      paddingTop: '80px'
     }}>
-      {/* AppBar */}
       <AppBar 
         position="fixed" 
         sx={{ 
@@ -142,7 +265,6 @@ const DashboardLayout = ({ children, menuItems, title }) => {
             </Badge>
           </IconButton>
 
-          {/* User Menu */}
           <IconButton 
             onClick={handleUserMenuClick}
             size="large"
@@ -198,7 +320,6 @@ const DashboardLayout = ({ children, menuItems, title }) => {
             </MenuItem>
           </Menu>
 
-          {/* Notifications Menu */}
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
@@ -224,80 +345,78 @@ const DashboardLayout = ({ children, menuItems, title }) => {
               <Typography variant="h6">Notifications</Typography>
             </Box>
             <List sx={{ py: 0 }}>
-              {notifications.map((notification) => (
-                <React.Fragment key={notification.id}>
-                  <ListItem 
-                    alignItems="flex-start"
-                    sx={{ 
-                      py: 2,
-                      px: 3,
-                      '&:hover': {
-                        backgroundColor: 'action.hover',
-                        cursor: 'pointer'
-                      }
-                    }}
-                  >
-                    <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>
-                        {notification.icon}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={notification.title}
-                      secondary={
-                        <React.Fragment>
-                          <Typography
-                            component="span"
-                            variant="body2"
-                            color="text.primary"
-                            sx={{ display: 'block' }}
-                          >
-                            {notification.message}
-                          </Typography>
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            {notification.time}
-                          </Typography>
-                        </React.Fragment>
-                      }
-                    />
-                  </ListItem>
-                  <Divider component="li" />
-                </React.Fragment>
-              ))}
+              {loadingNotifications ? (
+                <ListItem>
+                  <ListItemIcon><CircularProgress size={20} /></ListItemIcon>
+                  <ListItemText primary="Loading notifications..." />
+                </ListItem>
+              ) : notificationError ? (
+                <ListItem>
+                  <ListItemText primary={`Error: ${notificationError}`} sx={{ color: 'error.main' }} />
+                </ListItem>
+              ) : notifications.length === 0 ? (
+                <ListItem>
+                  <ListItemText primary="No new notifications" />
+                </ListItem>
+              ) : (
+                notifications.map((notification) => (
+                  <React.Fragment key={notification._id || notification.id}>
+                    <ListItem 
+                      alignItems="flex-start"
+                      sx={{ 
+                        py: 2,
+                        px: 3,
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                          cursor: 'pointer'
+                        }
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar sx={{ bgcolor: 'primary.main' }}>
+                          {getNotificationIcon(notification)}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={notification.title}
+                        secondary={renderNotificationContent(notification)}
+                      />
+                    </ListItem>
+                    <Divider component="li" />
+                  </React.Fragment>
+                ))
+              )}
             </List>
-            <Box 
-              sx={{ 
-                p: 1, 
-                borderTop: 1, 
-                borderColor: 'divider',
-                textAlign: 'center'
-              }}
-            >
-              <Typography 
-                component="button"
+            {notifications.length > 0 && !loadingNotifications && !notificationError && (
+              <Box 
                 sx={{ 
-                  color: 'primary.main',
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    textDecoration: 'underline'
-                  }
+                  p: 1, 
+                  borderTop: 1, 
+                  borderColor: 'divider',
+                  textAlign: 'center'
                 }}
-                onClick={handleNotificationClose}
               >
-                View All Notifications
-              </Typography>
-            </Box>
+                <Typography 
+                  component="button"
+                  sx={{ 
+                    color: 'primary.main',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}
+                  onClick={handleNotificationClose}
+                >
+                  View All Notifications
+                </Typography>
+              </Box>
+            )}
           </Menu>
         </Toolbar>
       </AppBar>
 
-      {/* Drawer */}
       <Drawer
         variant="permanent"
         sx={{
@@ -309,10 +428,11 @@ const DashboardLayout = ({ children, menuItems, title }) => {
             backgroundColor: 'transparent',
             borderRight: '1px solid rgba(0, 0, 0, 0.12)',
             boxShadow: 'none',
-            marginTop: '64px'  // Fixed margin to position below navbar
+            marginTop: '64px'
           },
         }}
       >
+        <Toolbar />
         <Box sx={{ overflow: 'auto' }}>
           <Box sx={{ p: 2 }}>
             <Typography 
@@ -330,7 +450,7 @@ const DashboardLayout = ({ children, menuItems, title }) => {
           <Divider />
           <List>
             {menuItems.map((item) => (
-              item.label !== 'Logout' && (  // Filter out the logout menu item
+              item.label !== 'Logout' && (
                 <ListItem key={item.label} disablePadding>
                   <ListItemButton
                     onClick={item.onClick}
@@ -377,18 +497,17 @@ const DashboardLayout = ({ children, menuItems, title }) => {
         </Box>
       </Drawer>
 
-      {/* Main Content */}
       <Box 
         component="main" 
         sx={{ 
           flexGrow: 1,
           p: 3,
           width: '100%',
-          minHeight: 'calc(100vh - 80px)',  // Adjust for navbar height
+          minHeight: 'calc(100vh - 80px)',
           backgroundColor: 'transparent',
           '& .dashboard-title': {
             mb: 3,
-            pt: 2  // Add padding to titles
+            pt: 2
           }
         }}
       >

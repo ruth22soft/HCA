@@ -2,15 +2,14 @@ import mongoose from 'mongoose';
 /**
  * @typedef {Object} IAdvice
  * @property {mongoose.Types.ObjectId} patientId - Reference to the patient
- * @property {('General Medicine'|'Blood Test'|'Diabetis Test'|'Cancer Test')} department
- * @property {string} subject 
- * @property {string} description 
- * @property {('Low'|'Normal'|'High'| 'Urgent')} urgencyLevel 
- * @property {Date} createdAt
- * @property {Date} updatedAt
  * @property {string} condition - Medical condition
  * @property {string} medications - Medications
  * @property {string} lifestyle - Lifestyle
+ * @property {('Low'|'Normal'|'High'| 'Urgent')} urgencyLevel 
+ * @property {('pending'|'approved'|'rejected')} status
+ * @property {Date} createdAt
+ * @property {Date} updatedAt
+
  */
 
 const adviceSchema = new mongoose.Schema({

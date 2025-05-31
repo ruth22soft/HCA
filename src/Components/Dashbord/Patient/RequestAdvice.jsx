@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import {
   Card,
   CardContent,
@@ -25,10 +26,9 @@ import DashboardLayout from '../DasboardLayout';
 const RequestAdvice = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    department: '',
     subject: '',
     description: '',
-    urgency: 'normal'
+    urgency: 'medium'
   });
 
   const menuItems = [
@@ -65,17 +65,61 @@ const RequestAdvice = () => {
   ];
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle form submission
-    console.log('Form submitted:', formData);
-    // You can add API call here
+    
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        toast.error('Please login to request advice');
+        navigate('/login');
+        return;
+      }
+
+      // Create notification for advice request
+      const response = await fetch('http://localhost:5000/api/notifications', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          type: 'advice',
+          title: 'New Advice Request',
+          message: `Patient ${user.name} is requesting medical advice`,
+          urgency: formData.urgency,
+          targetRole: 'physician',
+          metadata: {
+            patientId: user._id,
+            patientName: user.name,
+            subject: formData.subject,
+            description: formData.description,
+            urgency: formData.urgency
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit advice request');
+      }
+
+      toast.success('Advice request submitted successfully!');
+      setFormData({
+        subject: '',
+        description: '',
+        urgency: 'medium'
+      });
+    } catch (error) {
+      console.error('Error submitting advice request:', error);
+      toast.error('Failed to submit advice request. Please try again.');
+    }
   };
 
   return (
@@ -89,23 +133,6 @@ const RequestAdvice = () => {
           <form onSubmit={handleSubmit}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <InputLabel>Department</InputLabel>
-                  <Select
-                    name="department"
-                    value={formData.department}
-                    onChange={handleChange}
-                    required
-                  >
-                    <MenuItem value="general">General Medicine</MenuItem>
-                    <MenuItem value="cardiology">Cancer</MenuItem>
-                    <MenuItem value="orthopedics">Heart disease</MenuItem>
-                    <MenuItem value="pediatrics">Diabetes</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Subject"
@@ -113,6 +140,7 @@ const RequestAdvice = () => {
                   value={formData.subject}
                   onChange={handleChange}
                   required
+                  placeholder="Brief description of your concern"
                 />
               </Grid>
 
@@ -126,6 +154,7 @@ const RequestAdvice = () => {
                   multiline
                   rows={4}
                   required
+                  placeholder="Please provide detailed information about your medical concern..."
                 />
               </Grid>
 
@@ -138,10 +167,10 @@ const RequestAdvice = () => {
                     onChange={handleChange}
                     required
                   >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="normal">Normal</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="urgent">Urgent</MenuItem>
+                    <MenuItem value="low">Low - Not Urgent</MenuItem>
+                    <MenuItem value="medium">Medium - Standard Priority</MenuItem>
+                    <MenuItem value="high">High - Urgent</MenuItem>
+                    <MenuItem value="emergency">Emergency - Immediate Attention Required</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card,
@@ -10,6 +10,8 @@ import {
   ListItemText,
   ListItemIcon,
   Chip,
+  CircularProgress,
+  Box
 } from '@mui/material';
 import {
   Dashboard,
@@ -20,12 +22,20 @@ import {
   MedicalServices,
   CheckCircle,
   Schedule,
-  LocalHospital
+  LocalHospital,
+  DoneAll,
+  InfoOutlined
 } from '@mui/icons-material';
 import DashboardLayout from '../DasboardLayout';
+import { useAuth } from '../../Auth/AuthContext';
 
 const Recommendations = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [approvedAdvice, setApprovedAdvice] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const menuItems = [
     { 
@@ -60,109 +70,136 @@ const Recommendations = () => {
     }
   ];
 
-  const recommendations = [
-    {
-      id: 1,
-      doctor: 'Dr. Abebe',
-      date: '2024-12-15',
-      type: 'Medication',
-      status: 'Active',
-      description: 'Take Amoxicillin 500mg twice daily for 7 days',
-      notes: 'Take with food to avoid stomach upset'
-    },
-    {
-      id: 2,
-      doctor: 'Dr. Liya',
-      date: '2024-12-10',
-      type: 'Exercise',
-      status: 'Active',
-      description: '30 minutes of moderate walking daily',
-      notes: 'Best done in the morning or evening'
-    },
-    {
-      id: 3,
-      doctor: 'Dr. Bahru',
-      date: '2024-12-05',
-      type: 'Diet',
-      status: 'Active',
-      description: 'Low sodium diet recommended',
-      notes: 'Avoid processed foods and add more fresh vegetables'
+  const fetchApprovedAdvice = async () => {
+    if (!user || !user.token) {
+      setError('User not authenticated.');
+      setLoading(false);
+      return;
     }
-  ];
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`http://localhost:5000/api/advice/patient`, {
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch approved advice');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const sortedAdvice = data.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setApprovedAdvice(sortedAdvice);
+      } else {
+         setError(data.message || 'Failed to fetch approved advice.');
+      }
+
+    } catch (err) {
+      console.error('Error fetching approved advice:', err);
+      setError(err.message || 'Failed to fetch approved advice.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedAdvice();
+  }, [user]);
 
   return (
     <DashboardLayout menuItems={menuItems} title="Patient Portal">
       <Typography variant="h4" className="dashboard-title" gutterBottom>
-        Medical Recommendations
+        Medical Recommendations (Approved Advice)
       </Typography>
 
-      <Grid container spacing={3}>
-        {recommendations.map((rec) => (
-          <Grid item xs={12} key={rec.id}>
-            <Card>
-              <CardContent>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="h6" gutterBottom>
-                      {rec.type}
-                      <Chip
-                        label={rec.status}
-                        color="primary"
-                        size="small"
-                        sx={{ ml: 2 }}
-                      />
-                    </Typography>
+      {loading ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
+          <Typography variant="h6" sx={{ ml: 2 }}>Loading recommendations...</Typography>
+        </Box>
+      ) : error ? (
+        <Typography variant="h6" color="error" align="center">Error: {error}</Typography>
+      ) : approvedAdvice.length === 0 ? (
+        <Typography variant="h6" color="text.secondary" align="center">No approved advice found.</Typography>
+      ) : (
+        <Grid container spacing={3}>
+          {approvedAdvice.map((advice) => (
+            <Grid item xs={12} key={advice._id}>
+              <Card>
+                <CardContent>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Typography variant="h6" gutterBottom>
+                        Advice: {advice.condition}
+                        <Chip
+                          label="Approved"
+                          color="success"
+                          size="small"
+                          icon={<DoneAll />}
+                          sx={{ ml: 2 }}
+                        />
+                      </Typography>
+                    </Grid>
+
+                    {advice.medications && (
+                     <Grid item xs={12}>
+                       <List>
+                           <ListItem>
+                            <ListItemIcon>
+                              <LocalHospital />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary="Medications"
+                              secondary={advice.medications}
+                            />
+                          </ListItem>
+                       </List>
+                     </Grid>
+                    )}
+
+                    {advice.lifestyle && (
+                       <Grid item xs={12}>
+                       <List>
+                           <ListItem>
+                             <ListItemIcon>
+                               <CheckCircle />
+                             </ListItemIcon>
+                             <ListItemText 
+                               primary="Lifestyle Recommendations"
+                               secondary={advice.lifestyle}
+                             />
+                           </ListItem>
+                        </List>
+                      </Grid>
+                    )}
+
+                    <Grid item xs={12}>
+                       <List>
+                          <ListItem>
+                            <ListItemIcon>
+                              <Schedule />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary="Date Approved"
+                              secondary={new Date(advice.updatedAt).toLocaleDateString()}
+                            />
+                          </ListItem>
+                       </List>
+                    </Grid>
+
                   </Grid>
-
-                  <Grid item xs={12}>
-                    <List>
-                      <ListItem>
-                        <ListItemIcon>
-                          <LocalHospital />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary="Doctor"
-                          secondary={rec.doctor}
-                        />
-                      </ListItem>
-
-                      <ListItem>
-                        <ListItemIcon>
-                          <Schedule />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary="Date"
-                          secondary={rec.date}
-                        />
-                      </ListItem>
-
-                      <ListItem>
-                        <ListItemIcon>
-                          <CheckCircle />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary="Recommendation"
-                          secondary={rec.description}
-                        />
-                      </ListItem>
-
-                      <ListItem>
-                        <ListItemIcon>
-                          <Comment />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary="Additional Notes"
-                          secondary={rec.notes}
-                        />
-                      </ListItem>
-                    </List>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </DashboardLayout>
   );
 };
